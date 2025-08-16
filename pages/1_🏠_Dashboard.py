@@ -198,6 +198,9 @@ def generate_pdf(df, title="Cash Flow Report"):
 import os
 from dotenv import load_dotenv
 
+# Suppress sklearn warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.utils.validation")
+
 # Load environment variables
 load_dotenv()
 
@@ -261,14 +264,14 @@ st.subheader("Performance Comparison")
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    date_select = st.selectbox("Date Range", ["Last 30 Days", "Last 60 Days", "Last 90 Days", "Year to Date", "Custom"])
+    date_select = st.selectbox("Date Range", ["Last 30 Days", "Last 60 Days", "Last 90 Days", "Year to Date", "Custom"], key="main_date_select")
     comparison_to = st.selectbox("Range", [
         "Last Month vs Prev", 
         "Same Month LY", 
         "Last 3m vs LY", 
         "During-Month vs LY", 
         "Custom"
-    ])
+    ], key="main_comparison_select")
     
     if comparison_to == "Custom" or date_select == "Custom":
         st.write("**Select Date Range:**")
@@ -280,7 +283,8 @@ st.sidebar.subheader("🗓️ Global Date Filter")
 global_date_range = st.sidebar.selectbox(
     "Filter All Data By",
     ["Last 30 Days", "Last 60 Days", "Last 90 Days", "Year to Date", "All Time"],
-    index=0
+    index=0,
+    key="sidebar_global_date_filter"
 )
 
 if global_date_range == "Custom":
@@ -466,7 +470,7 @@ with tabs[0]:  # Overview Tab
             category = st.selectbox("Category", [
                 "Costa USD", "Costa CRC", "HK USD", "Stripe %", 
                 "Huub Principal", "Huub Interest", "Google Ads"
-            ])
+            ], key="overview_cost_category")
         
         with col3:
             amount = st.number_input("Amount", min_value=0.0, step=100.0)
@@ -498,14 +502,14 @@ with tabs[1]:  # Economics Tab
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        date_select = st.selectbox("Date Range", ["Last 30 Days", "Last 60 Days", "Last 90 Days", "Year to Date", "Custom"])
+        date_select = st.selectbox("Date Range", ["Last 30 Days", "Last 60 Days", "Last 90 Days", "Year to Date", "Custom"], key="economics_date_select")
         comparison_to = st.selectbox("Range", [
             "Last Month vs Prev", 
             "Same Month LY", 
             "Last 3m vs LY", 
             "During-Month vs LY", 
             "Custom"
-        ])
+        ], key="economics_comparison_select")
         
         if comparison_to == "Custom" or date_select == "Custom":
             st.write("**Select Date Range:**")
@@ -842,7 +846,7 @@ with col2:
         "Huub Principal", 
         "Huub Interest", 
         "Google Ads"
-    ])
+    ], key="monthly_cost_category")
 
 with col3:
     amount = st.number_input("Amount", min_value=0.0, step=100.0)
@@ -1247,7 +1251,7 @@ try:
     with col1:
         range_select = st.selectbox("Date Range", 
                                    ["12 Months", "Last 7 Days", "YTD", "QTD", "YTD vs LY", "During-Month vs LY"], 
-                                   index=0)
+                                   index=0, key="data_overview_range_select")
     
     # Filter data based on selected range
     filtered_df = filter_data_by_range(df, range_select)
