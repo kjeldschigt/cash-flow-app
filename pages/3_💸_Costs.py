@@ -1,4 +1,9 @@
 import streamlit as st
+import warnings
+import numpy as np
+
+# Suppress sklearn warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.utils.validation")
 
 # Load settings from session_state with DB fallback
 def get_setting(key, default_value):
@@ -46,26 +51,29 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.storage import load_costs_data, get_combined_data, load_table, upsert_from_csv, load_settings
 from services.fx import apply_fx_conversion, get_rate_scenarios, get_monthly_rate
+from services.airtable import load_combined_data
 
-st.title("Cost Analysis & Breakdown")
+def _mpa_v1():
+    """Main page application function"""
+    st.title("Cost Analysis & Breakdown")
 
-# Get cost values from Settings with DB fallback
-costa_usd_cr = get_setting('costa_usd', 19000.0)
-costa_crc = get_setting('costa_crc', 38000000.0)
-hk_usd = get_setting('hk_usd', 40000.0)
-stripe_fee_pct = get_setting('stripe_fee', 4.2)
-huub_principal = get_setting('huub_principal', 1250000.0)
-huub_interest = get_setting('huub_interest', 18750.0)
-google_ads = get_setting('google_ads', 27500.0)
+    # Get cost values from Settings with DB fallback
+    costa_usd_cr = get_setting('costa_usd', 19000.0)
+    costa_crc = get_setting('costa_crc', 38000000.0)
+    hk_usd = get_setting('hk_usd', 40000.0)
+    stripe_fee_pct = get_setting('stripe_fee', 4.2)
+    huub_principal = get_setting('huub_principal', 1250000.0)
+    huub_interest = get_setting('huub_interest', 18750.0)
+    google_ads = get_setting('google_ads', 27500.0)
 
-# Main Navigation Tabs
-tabs = st.tabs(["Overview", "Breakdown", "Trends", "Entry"])
+    # Main Navigation Tabs
+    tabs = st.tabs(["Overview", "Breakdown", "Trends", "Entry"])
 
-with tabs[3]:  # Entry Tab
-    st.subheader("Manual Cost Entry")
-    
-    # Entry form per category
-    col1, col2, col3 = st.columns(3)
+    with tabs[3]:  # Entry Tab
+        st.subheader("Manual Cost Entry")
+        
+        # Entry form per category
+        col1, col2, col3 = st.columns(3)
     
     with col1:
         entry_date = st.date_input("Entry Date", value=pd.Timestamp.now().replace(day=1), key="cost_entry_date")
@@ -324,47 +332,27 @@ with tabs[1]:  # Breakdown Tab
             st.write(f"**Principal Amount:** ${huub_principal:,.0f}")
         with col2:
             annual_interest = huub_interest * 12
-            st.write(f"**Annual Interest:** ${annual_interest:,.0f}")
             interest_rate = (annual_interest / huub_principal * 100) if huub_principal > 0 else 0
             st.write(f"**Effective Rate:** {interest_rate:.1f}%")
 
-with tabs[0]:  # Overview Tab
-    st.subheader("Cost Overview")
-    
-    # Convert CRC to USD (assuming 520 CRC/USD)
-    crc_to_usd_rate = get_setting('crc_usd_rate', 520.0)
-    costa_crc_usd = costa_crc / crc_to_usd_rate
-    
-    # Calculate total monthly costs
-    total_monthly_costs = (
-        costa_usd_cr + 
-        costa_crc_usd + 
-        hk_usd + 
-        huub_interest + 
-        google_ads
-    )
-    
-    # Display cost metrics in columns
-    col1, col2, col3, col4 = st.columns(4)
+    with tabs[0]:  # Overview Tab
+        st.subheader("Cost Overview")
+        
+        # Convert CRC to USD (assuming 520 CRC/USD)
+        current_fx_rate = get_monthly_rate()
+        costa_crc_usd = apply_fx_conversion(costa_crc, current_fx_rate)
+        
+        # Calculate total monthly costs
+        total_monthly_costs = costa_usd_cr + costa_crc_usd + hk_usd + huub_principal + huub_interest + google_ads
+        
+        # Display key metrics in columns
+        col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Total Monthly Costs", f"${total_monthly_costs:,.0f}")
     
     with col2:
-        st.metric("Annual Costs", f"${total_monthly_costs * 12:,.0f}")
-    
-    with col3:
-        avg_daily_cost = total_monthly_costs / 30
-        st.metric("Daily Average", f"${avg_daily_cost:,.0f}")
-    
-    with col4:
-        # Assume 125k monthly revenue for cost ratio
-        monthly_revenue = get_setting('monthly_revenue', 125000.0)
-        cost_ratio = (total_monthly_costs / monthly_revenue * 100) if monthly_revenue > 0 else 0
-        st.metric("Cost Ratio", f"{cost_ratio:.1f}%")
-    
-    # Additional overview metrics
-    col1, col2, col3, col4 = st.columns(4)
+        fixed_costs = costa_usd_cr + costa_crc_usd + hk_usd + huub_principal + huub_interest
     
     with col1:
         largest_cost = max(costa_usd_cr, costa_crc_usd, hk_usd, huub_interest, google_ads)
@@ -389,9 +377,9 @@ except Exception as e:
     costs_df = pd.DataFrame()
 
 try:
-    combined_df = get_combined_data()
+    combined_df = load_combined_data()
 except Exception as e:
-    st.error(f"Data load error (combined): {e}")
+    st.error(f"Data load error: {e}")
     combined_df = pd.DataFrame()
 
 if not costs_df.empty or not combined_df.empty:
@@ -619,9 +607,8 @@ if not costs_df.empty or not combined_df.empty:
 else:
     st.warning("No cost data available. Please check your data sources.")
 
-# Handle any other errors
+# Main execution wrapper
 try:
-    pass  # Main processing already handled above
+    _mpa_v1()
 except Exception as e:
-    st.error(f"Error loading cost data: {str(e)}")
-    st.info("Please check that your data files are properly configured.")
+    st.error(f"App error: {e}")

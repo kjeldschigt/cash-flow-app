@@ -69,6 +69,53 @@ def get_airtable_data():
     
     return {'leads': leads}
 
+def load_combined_data():
+    """Combine sales/leads from Airtable fetch using pyairtable.Table.all()"""
+    try:
+        if not all([api_key, base_id, table_name]):
+            return pd.DataFrame()
+        
+        # Initialize Airtable connection
+        table = pyairtable.Table(api_key, base_id, table_name)
+        
+        # Fetch all records
+        records = table.all()
+        
+        if not records:
+            return pd.DataFrame()
+        
+        # Convert to DataFrame with combined sales/leads data
+        data = []
+        for record in records:
+            fields = record['fields']
+            
+            # Standardize field names for combined data
+            row = {
+                'Date': fields.get('Date', fields.get('Created', pd.Timestamp.now().strftime('%Y-%m-%d'))),
+                'Company': fields.get('Company', fields.get('Name', fields.get('Lead_Name', 'Unknown'))),
+                'Sales_USD': float(fields.get('Sales_USD', fields.get('Value', fields.get('Deal_Size', 0)))),
+                'Lead_Source': fields.get('Lead_Source', fields.get('Source', 'Unknown')),
+                'Status': fields.get('Status', fields.get('Stage', 'New')),
+                'Type': fields.get('Type', 'Lead'),
+                'Contact_Email': fields.get('Contact_Email', fields.get('Email', '')),
+                'Notes': fields.get('Notes', fields.get('Description', ''))
+            }
+            data.append(row)
+        
+        df = pd.DataFrame(data)
+        
+        # Ensure Date column is datetime
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Fill NaN dates with current date
+        df['Date'] = df['Date'].fillna(pd.Timestamp.now())
+        
+        return df
+        
+    except Exception as e:
+        print(f"Error in load_combined_data: {e}")
+        return pd.DataFrame()
+
 def get_lead_metrics():
     """Get lead metrics summary"""
     data = get_airtable_data()
@@ -83,3 +130,8 @@ def get_lead_metrics():
         'qualified_leads': qualified_count,
         'avg_lead_value': total_value / len(leads) if leads else 0
     }
+
+# Create alias for backward compatibility
+def fetch_combined_data():
+    """Alias to load_combined_data for backward compatibility"""
+    return load_combined_data()
