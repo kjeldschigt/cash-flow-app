@@ -58,6 +58,83 @@ huub_principal = get_setting('huub_principal', 1250000.0)
 huub_interest = get_setting('huub_interest', 18750.0)
 google_ads = get_setting('google_ads', 27500.0)
 
+# Main Navigation Tabs
+tabs = st.tabs(["Overview", "Breakdown", "Trends", "Entry"])
+
+with tabs[3]:  # Entry Tab
+    st.subheader("Manual Cost Entry")
+    
+    # Entry form per category
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        entry_date = st.date_input("Entry Date", value=pd.Timestamp.now().replace(day=1), key="cost_entry_date")
+    
+    with col2:
+        cost_category = st.selectbox("Cost Category", [
+            "Costa USD", 
+            "Costa CRC", 
+            "HK USD", 
+            "Stripe %", 
+            "Huub Principal", 
+            "Huub Interest", 
+            "Google Ads"
+        ], key="cost_entry_category")
+    
+    with col3:
+        cost_amount = st.number_input("Amount", min_value=0.0, step=100.0, key="cost_entry_amount")
+    
+    if st.button("Add Cost Entry", key="add_cost_entry_btn"):
+        try:
+            # Insert cost entry into database
+            from services.storage import insert_monthly_cost
+            insert_monthly_cost(entry_date.strftime('%Y-%m'), cost_category, cost_amount)
+            st.success(f"Added {cost_category}: ${cost_amount:,.2f} for {entry_date.strftime('%Y-%m')}")
+            st.rerun()  # Refresh to show updated data
+        except Exception as e:
+            st.error(f"Error adding cost entry: {str(e)}")
+    
+    # Bulk entry section
+    with st.expander("Bulk Cost Entry"):
+        st.write("**Upload CSV with columns: Date, Category, Amount**")
+        uploaded_file = st.file_uploader("Choose CSV file", type="csv", key="bulk_cost_upload")
+        
+        if uploaded_file is not None:
+            try:
+                bulk_df = pd.read_csv(uploaded_file)
+                st.dataframe(bulk_df.head(), use_container_width=True)
+                
+                if st.button("Process Bulk Upload", key="process_bulk_costs"):
+                    # Process each row
+                    success_count = 0
+                    for _, row in bulk_df.iterrows():
+                        try:
+                            from services.storage import insert_monthly_cost
+                            date_str = pd.to_datetime(row['Date']).strftime('%Y-%m')
+                            insert_monthly_cost(date_str, row['Category'], float(row['Amount']))
+                            success_count += 1
+                        except Exception as e:
+                            st.error(f"Error processing row: {e}")
+                    
+                    st.success(f"Successfully processed {success_count} cost entries")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Error processing file: {e}")
+    
+    # Recent entries display
+    with st.expander("Recent Cost Entries"):
+        try:
+            from services.storage import load_monthly_costs
+            recent_costs = load_monthly_costs()
+            if recent_costs:
+                costs_df = pd.DataFrame(recent_costs)
+                # Show last 10 entries
+                st.dataframe(costs_df.tail(10), use_container_width=True)
+            else:
+                st.info("No recent cost entries found")
+        except Exception as e:
+            st.error(f"Error loading recent entries: {e}")
+
 # Monthly Cost Entry
 st.subheader("Monthly Cost Entry")
 
@@ -185,60 +262,126 @@ st.session_state.costs = {
 current_fx_rate = get_monthly_rate('2024-08', 'base')  # Get base rate
 costa_crc_usd = costa_crc / current_fx_rate if current_fx_rate > 0 else 0
 
-# Cost Breakdown Table
-st.subheader("Cost Breakdown Analysis")
+with tabs[1]:  # Breakdown Tab
+    st.subheader("Cost Breakdown by Category")
+    
+    # Create cost breakdown data
+    cost_data = {
+        'Category': ['Costa Rica (USD)', 'Costa Rica (CRC→USD)', 'Hong Kong (USD)', 'Huub Interest', 'Google Ads', 'Stripe Fee (Variable)'],
+        'Monthly Cost': [costa_usd_cr, costa_crc_usd, hk_usd, huub_interest, google_ads, 0],  # Stripe varies by sales
+        'Annual Cost': [costa_usd_cr * 12, costa_crc_usd * 12, hk_usd * 12, huub_interest * 12, google_ads * 12, 0],
+        'Percentage': [
+            (costa_usd_cr / (costa_usd_cr + costa_crc_usd + hk_usd + huub_interest + google_ads) * 100),
+            (costa_crc_usd / (costa_usd_cr + costa_crc_usd + hk_usd + huub_interest + google_ads) * 100),
+            (hk_usd / (costa_usd_cr + costa_crc_usd + hk_usd + huub_interest + google_ads) * 100),
+            (huub_interest / (costa_usd_cr + costa_crc_usd + hk_usd + huub_interest + google_ads) * 100),
+            (google_ads / (costa_usd_cr + costa_crc_usd + hk_usd + huub_interest + google_ads) * 100),
+            0  # Variable
+        ]
+    }
+    
+    cost_df = pd.DataFrame(cost_data)
+    cost_df['Monthly Cost'] = cost_df['Monthly Cost'].apply(lambda x: f"${x:,.0f}")
+    cost_df['Annual Cost'] = cost_df['Annual Cost'].apply(lambda x: f"${x:,.0f}")
+    cost_df['Percentage'] = cost_df['Percentage'].apply(lambda x: f"{x:.1f}%")
+    
+    st.dataframe(cost_df, use_container_width=True)
+    
+    # Per-category details with expanders
+    with st.expander("Costa Rica Details"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**USD Component:** ${costa_usd_cr:,.0f}")
+            st.write(f"**CRC Component:** ₡{costa_crc:,.0f}")
+        with col2:
+            st.write(f"**CRC→USD Rate:** {current_fx_rate:.0f}")
+            st.write(f"**CRC in USD:** ${costa_crc_usd:,.0f}")
+    
+    with st.expander("Hong Kong Details"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Monthly Cost:** ${hk_usd:,.0f}")
+            st.write(f"**Daily Cost:** ${hk_usd/30:,.0f}")
+        with col2:
+            st.write(f"**Annual Cost:** ${hk_usd*12:,.0f}")
+            st.write(f"**% of Total:** {(hk_usd/(costa_usd_cr + costa_crc_usd + hk_usd + huub_interest + google_ads)*100):.1f}%")
+    
+    with st.expander("Stripe & Variable Costs"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Stripe Fee Rate:** {stripe_fee_pct:.1f}%")
+            sample_sales = 125000
+            stripe_cost = sample_sales * (stripe_fee_pct / 100)
+            st.write(f"**On ${sample_sales:,} sales:** ${stripe_cost:,.0f}")
+        with col2:
+            st.write(f"**Google Ads:** ${google_ads:,.0f}")
+            st.write(f"**Total Variable:** ${google_ads + stripe_cost:,.0f}")
+    
+    with st.expander("Huub Loan Details"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Monthly Interest:** ${huub_interest:,.0f}")
+            st.write(f"**Principal Amount:** ${huub_principal:,.0f}")
+        with col2:
+            annual_interest = huub_interest * 12
+            st.write(f"**Annual Interest:** ${annual_interest:,.0f}")
+            interest_rate = (annual_interest / huub_principal * 100) if huub_principal > 0 else 0
+            st.write(f"**Effective Rate:** {interest_rate:.1f}%")
 
-cost_breakdown = {
-    'Cost Category': [
-        'Costa Rica Operations (USD)',
-        'Costa Rica Operations (CRC→USD)',
-        'Hong Kong Operations (USD)',
-        'Stripe Processing Fees',
-        'Huub Loan Principal',
-        'Huub Loan Interest',
-        'Google Ads (USD)',
-        'TOTAL COSTS'
-    ],
-    'Amount (USD)': [
-        costa_usd_cr,
-        costa_crc_usd,
-        hk_usd,
-        0,  # Will calculate based on revenue
-        huub_principal,
-        huub_interest,
-        google_ads,
-        costa_usd_cr + costa_crc_usd + hk_usd + huub_principal + huub_interest + google_ads
-    ],
-    'Original Currency': [
-        f'${costa_usd_cr:,.0f}',
-        f'₡{costa_crc:,.0f}',
-        f'${hk_usd:,.0f}',
-        f'{stripe_fee_pct}%',
-        f'${huub_principal:,.0f}',
-        f'${huub_interest:,.0f}',
-        f'${google_ads:,.0f}',
-        'Mixed'
-    ]
-}
+with tabs[0]:  # Overview Tab
+    st.subheader("Cost Overview")
+    
+    # Convert CRC to USD (assuming 520 CRC/USD)
+    crc_to_usd_rate = get_setting('crc_usd_rate', 520.0)
+    costa_crc_usd = costa_crc / crc_to_usd_rate
+    
+    # Calculate total monthly costs
+    total_monthly_costs = (
+        costa_usd_cr + 
+        costa_crc_usd + 
+        hk_usd + 
+        huub_interest + 
+        google_ads
+    )
+    
+    # Display cost metrics in columns
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Monthly Costs", f"${total_monthly_costs:,.0f}")
+    
+    with col2:
+        st.metric("Annual Costs", f"${total_monthly_costs * 12:,.0f}")
+    
+    with col3:
+        avg_daily_cost = total_monthly_costs / 30
+        st.metric("Daily Average", f"${avg_daily_cost:,.0f}")
+    
+    with col4:
+        # Assume 125k monthly revenue for cost ratio
+        monthly_revenue = get_setting('monthly_revenue', 125000.0)
+        cost_ratio = (total_monthly_costs / monthly_revenue * 100) if monthly_revenue > 0 else 0
+        st.metric("Cost Ratio", f"{cost_ratio:.1f}%")
+    
+    # Additional overview metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        largest_cost = max(costa_usd_cr, costa_crc_usd, hk_usd, huub_interest, google_ads)
+        st.metric("Largest Cost Item", f"${largest_cost:,.0f}")
+    
+    with col2:
+        fixed_costs = costa_usd_cr + costa_crc_usd + hk_usd + huub_interest
+        st.metric("Fixed Costs", f"${fixed_costs:,.0f}")
+    
+    with col3:
+        variable_costs = google_ads  # Simplified
+        st.metric("Variable Costs", f"${variable_costs:,.0f}")
+    
+    with col4:
+        cost_per_day = total_monthly_costs / 30
+        st.metric("Cost per Day", f"${cost_per_day:,.0f}")
 
-breakdown_df = pd.DataFrame(cost_breakdown)
-st.dataframe(breakdown_df, use_container_width=True)
-
-# Cost Summary Metrics
-total_fixed_costs = costa_usd_cr + costa_crc_usd + hk_usd + huub_principal + huub_interest + google_ads
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Total Fixed Costs", f"${total_fixed_costs:,.0f}")
-with col2:
-    st.metric("CRC Converted", f"${costa_crc_usd:,.0f}", f"₡{costa_crc:,.0f}")
-with col3:
-    st.metric("FX Rate Used", f"{current_fx_rate:.0f}")
-with col4:
-    st.metric("Stripe Fee Rate", f"{stripe_fee_pct}%")
-
-# Load data
 try:
     costs_df = load_costs_data()
 except Exception as e:
@@ -264,7 +407,7 @@ if not costs_df.empty or not combined_df.empty:
         stripe_fees = total_sales * (stripe_fee_pct / 100)
         
         # Update total costs including Stripe fees
-        total_all_costs = total_fixed_costs + stripe_fees
+        total_all_costs = total_monthly_costs + stripe_fees
         
         # Calculate margins
         gross_margin = total_sales - total_all_costs

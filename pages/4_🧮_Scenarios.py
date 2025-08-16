@@ -980,14 +980,24 @@ if not df.empty:
             if economy_scenario == "Recession":
                 st.write("⚠️ Recession scenario active")
             elif economy_scenario == "Growth":
-                st.write("📈 Growth scenario active")
-            else:
-                st.write("📊 Normal economic conditions")
+                st.title("🧮 Scenario Planning & Projections")
+
+# Main Navigation Tabs
+tabs = st.tabs(["Forecasting", "Scenarios", "Visuals", "Levers"])
+
+# Load combined data and FX rates
+try:
+    combined_df = get_combined_data()
+    fx_rates = get_rate_scenarios()
     
-    else:
-        st.warning("No sales data available for scenario planning. Please check your data files.")
-else:
-    st.warning("No data available. Please check your data sources.")
+    if combined_df.empty:
+        st.warning("No data available for scenario analysis")
+        combined_df = pd.DataFrame()  # Continue with empty data
+        
+except Exception as e:
+    st.error(f"Error loading data: {e}")
+    combined_df = pd.DataFrame()
+    fx_rates = {} 
 
 # Handle any other errors
 try:
