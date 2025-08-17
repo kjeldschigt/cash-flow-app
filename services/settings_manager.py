@@ -180,6 +180,32 @@ def get_all_settings() -> dict:
         st.error(f"Error loading all settings: {e}")
         return {}
 
+def set_setting(key: str, value: Any) -> None:
+    """Alias for save_setting to maintain compatibility."""
+    save_setting(key, value)
+
+def update_setting(key: str, value):
+    """Update or insert a setting in the database."""
+    save_setting(key, value)
+
+# Ensure settings table exists
+def initialize_settings():
+    conn = sqlite3.connect('cashflow.db')
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    # Initialize theme if not set
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", ('theme', 'light'))
+    conn.commit()
+    conn.close()
+
+# Run on import
+initialize_settings()
+
 def reset_setting(key: str) -> None:
     """Reset a setting by removing it from session state and database."""
     try:

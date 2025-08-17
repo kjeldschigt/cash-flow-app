@@ -77,6 +77,7 @@ def cost_entry_form(month: Optional[str] = None, category: Optional[str] = None,
             "Cost Category", 
             cost_categories,
             index=default_index,
+            format_func=lambda x: x if isinstance(x, str) else x.get("name", str(x)),
             key=f"{form_key}_cost_entry_category"
         )
     

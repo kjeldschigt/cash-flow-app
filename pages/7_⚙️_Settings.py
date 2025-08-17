@@ -5,44 +5,79 @@ import os
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.storage import save_settings_to_db, load_settings
+from utils.theme_manager import set_theme, get_current_theme, apply_theme
+from services.settings_manager import get_setting, set_setting, get_all_settings
+from services.auth import require_auth
 
-st.title("App Settings")
+# Check authentication
+require_auth()
+
+st.title("Settings")
+
+# Theme toggle
+current_theme = get_current_theme()
+theme_options = {"Light": "light", "Dark": "dark"}
+selected_theme = st.radio("Select Theme", options=list(theme_options.keys()), index=list(theme_options.keys()).index("Light" if current_theme == "light" else "Dark"))
+if st.button("Apply Theme"):
+    set_theme(theme_options[selected_theme])
 
 # Load existing settings from database
 try:
-    saved_settings = load_settings()
+    saved_settings = get_all_settings()
 except:
     saved_settings = {}
 
-# Theme Section
-st.subheader("🎨 Theme")
+# Cost Defaults Section
+st.subheader("💸 Cost Defaults")
 with st.container():
-    theme = st.selectbox(
-        "Application Theme", 
-        ["Light", "Dark"], 
-        index=0 if saved_settings.get('theme', 'light') == 'light' else 1,
-        help="Changes the visual theme across all pages"
-    )
-    
-    # Apply theme from theme manager
-    st.markdown(apply_theme(st.session_state.theme), unsafe_allow_html=True)
-    
-    if theme == "Light":
-        st.session_state.theme = "light"
-    else:
-        st.session_state.theme = "dark"
-    
-    st.info(f"Current theme: **{theme}** - Applied app-wide")
-
-# Business Metrics Defaults Section
-st.subheader("📊 Business Metrics Defaults")
-with st.container():
-    st.write("Set default values for business metrics used across dashboards")
+    st.write("Set default values for cost calculations and FX rates")
     
     col1, col2 = st.columns(2)
     
     with col1:
+        # Cost-related defaults
+        google_ads = st.number_input(
+            "Google Ads (Monthly)", 
+            value=float(saved_settings.get('google_ads', 5000.0)), 
+            min_value=0.0, 
+            step=100.0,
+            help="Default monthly Google Ads spend"
+        )
+        if google_ads != saved_settings.get('google_ads', 5000.0):
+            set_setting('google_ads', google_ads)
+            
+        huub_principal = st.number_input(
+            "Huub Principal Payment", 
+            value=float(saved_settings.get('huub_principal', 10000.0)), 
+            min_value=0.0, 
+            step=500.0,
+            help="Default Huub principal payment"
+        )
+        if huub_principal != saved_settings.get('huub_principal', 10000.0):
+            set_setting('huub_principal', huub_principal)
+            
+        huub_interest = st.number_input(
+            "Huub Interest Payment", 
+            value=float(saved_settings.get('huub_interest', 2000.0)), 
+            min_value=0.0, 
+            step=100.0,
+            help="Default Huub interest payment"
+        )
+        if huub_interest != saved_settings.get('huub_interest', 2000.0):
+            set_setting('huub_interest', huub_interest)
+    
+    with col2:
+        # FX rates
+        usd_cad_rate = st.number_input(
+            "USD/CAD Exchange Rate", 
+            value=float(saved_settings.get('usd_cad_rate', 1.35)), 
+            min_value=0.0, 
+            step=0.01,
+            help="Default USD to CAD exchange rate"
+        )
+        if usd_cad_rate != saved_settings.get('usd_cad_rate', 1.35):
+            set_setting('usd_cad_rate', usd_cad_rate)
+            
         occupancy = st.number_input(
             "Default Occupancy %", 
             value=float(saved_settings.get('occupancy', 75.0)), 
@@ -51,7 +86,9 @@ with st.container():
             step=0.1,
             help="Default occupancy rate for calculations"
         )
-        validate_number_input(occupancy, "Occupancy Rate", min_val=0.0, max_val=100.0)
+        if occupancy != saved_settings.get('occupancy', 75.0):
+            set_setting('occupancy', occupancy)
+            
         total_leads = st.number_input(
             "Default Total Leads", 
             value=int(saved_settings.get('total_leads', 100)), 
@@ -59,31 +96,8 @@ with st.container():
             step=1,
             help="Default total leads count"
         )
-        validate_number_input(total_leads, "Total Leads", min_val=0)
-    
-    with col2:
-        mql = st.number_input(
-            "Marketing Qualified Leads (MQL)", 
-            value=int(saved_settings.get('mql', 50)), 
-            min_value=0, 
-            step=1,
-            help="Default MQL count"
-        )
-        validate_number_input(mql, "MQL", min_val=0)
-        sql = st.number_input(
-            "Sales Qualified Leads (SQL)", 
-            value=int(saved_settings.get('sql', 20)), 
-            min_value=0, 
-            step=1,
-            help="Default SQL count"
-        )
-        validate_number_input(sql, "SQL", min_val=0)
-
-# Save business metrics to session state
-st.session_state.occupancy = occupancy
-st.session_state.total_leads = total_leads
-st.session_state.mql = mql
-st.session_state.sql = sql
+        if total_leads != saved_settings.get('total_leads', 100):
+            set_setting('total_leads', total_leads)
 
 # Cost Levers Section
 st.subheader("💰 Cost Levers")
@@ -173,8 +187,7 @@ with col1:
     st.write("**Business Metrics:**")
     st.write(f"• Occupancy: {occupancy}%")
     st.write(f"• Total Leads: {total_leads}")
-    st.write(f"• MQL: {mql}")
-    st.write(f"• SQL: {sql}")
+    st.write(f"• MQL: {get_setting('mql', 'N/A')}")
 
 with col2:
     st.write("**Regional Costs:**")

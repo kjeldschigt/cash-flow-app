@@ -2,14 +2,14 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
-import sqlite3
-import hashlib
 from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.theme_manager import get_setting, apply_theme
+from utils.theme_manager import apply_theme, get_current_theme
+from services.auth import init_auth_db, register_user, login_user, is_authenticated, logout_user
+from services.settings_manager import get_setting
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -21,102 +21,75 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Authentication functions
-def init_auth_db():
-    """Initialize authentication database"""
-    with sqlite3.connect('users.db') as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP
-            )
-        """)
-
-def hash_password(password: str) -> str:
-    """Hash password with salt"""
-    salt = os.urandom(32)
-    pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
-    return (salt + pwdhash).hex()
-
-def verify_password(stored_password: str, provided_password: str) -> bool:
-    """Verify password against hash"""
-    try:
-        stored_bytes = bytes.fromhex(stored_password)
-        salt = stored_bytes[:32]
-        stored_hash = stored_bytes[32:]
-        pwdhash = hashlib.pbkdf2_hmac('sha256', provided_password.encode('utf-8'), salt, 100000)
-        return pwdhash == stored_hash
-    except:
-        return False
-
-def register_user(email: str, password: str) -> bool:
-    """Register new user"""
-    try:
-        password_hash = hash_password(password)
-        with sqlite3.connect('users.db') as conn:
-            conn.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)", 
-                       (email, password_hash))
-        return True
-    except sqlite3.IntegrityError:
-        return False
-
-def authenticate_user(email: str, password: str) -> bool:
-    """Authenticate user login"""
-    with sqlite3.connect('users.db') as conn:
-        result = conn.execute("SELECT password_hash FROM users WHERE email = ?", (email,)).fetchone()
-        if result and verify_password(result[0], password):
-            conn.execute("UPDATE users SET last_login = ? WHERE email = ?", 
-                       (datetime.now(), email))
-            return True
-    return False
+# Initialize settings on app start
+if 'theme' not in st.session_state:
+    apply_theme(get_setting('theme', 'light'))
 
 def show_login_form():
     """Display login/register form"""
     st.title("🔐 Cash Flow Dashboard - Login")
     
-    tab1, tab2 = st.tabs(["Login", "Register"])
-    
-    with tab1:
-        st.subheader("Login to your account")
-        with st.form("login_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Login", use_container_width=True)
-            
-            if submit:
-                if email and password:
-                    if authenticate_user(email, password):
-                        st.session_state.authenticated = True
-                        st.session_state.user_email = email
-                        st.success("Login successful!")
-                        st.rerun()
-                    else:
-                        st.error("Invalid email or password")
-                else:
-                    st.error("Please enter both email and password")
-    
-    with tab2:
+    # Show registration form if requested
+    if st.session_state.get('show_register', False):
         st.subheader("Create new account")
         with st.form("register_form"):
-            email = st.text_input("Email", key="reg_email")
-            password = st.text_input("Password", type="password", key="reg_password")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
             confirm_password = st.text_input("Confirm Password", type="password")
-            submit = st.form_submit_button("Register", use_container_width=True)
+            col1, col2 = st.columns(2)
             
-            if submit:
+            with col1:
+                register_submit = st.form_submit_button("Register", use_container_width=True)
+            with col2:
+                cancel_register = st.form_submit_button("Cancel", use_container_width=True)
+            
+            if register_submit:
                 if not email or not password:
                     st.error("Please fill in all fields")
                 elif password != confirm_password:
                     st.error("Passwords don't match")
                 elif len(password) < 6:
                     st.error("Password must be at least 6 characters")
-                elif register_user(email, password):
-                    st.success("Registration successful! Please login with your credentials.")
                 else:
-                    st.error("User with this email already exists")
+                    success, message = register_user(email, password)
+                    if success:
+                        st.success(message)
+                        st.session_state.show_register = False
+                        st.rerun()
+                    else:
+                        st.error(message)
+            
+            if cancel_register:
+                st.session_state.show_register = False
+                st.rerun()
+    else:
+        # Login form
+        st.subheader("Login to your account")
+        with st.form("login_form"):
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                login_submit = st.form_submit_button("Login", use_container_width=True)
+            with col2:
+                register_button = st.form_submit_button("Register", use_container_width=True)
+            
+            if login_submit:
+                if email and password:
+                    success, result = login_user(email, password)
+                    if success:
+                        st.session_state.user = result
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error(result)
+                else:
+                    st.error("Please enter both email and password")
+            
+            if register_button:
+                st.session_state.show_register = True
+                st.rerun()
 
 def main_dashboard():
     """Main dashboard application"""
@@ -130,12 +103,11 @@ def main_dashboard():
         st.markdown("Use the pages in the sidebar to navigate through different sections of the dashboard.")
         
         st.markdown("---")
-        st.write(f"👤 Logged in as: {st.session_state.user_email}")
+        user_email = st.session_state.user.get('email', 'Unknown') if st.session_state.user else 'Unknown'
+        st.write(f"👤 Logged in as: {user_email}")
         
         if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user_email = None
-            st.rerun()
+            logout_user()
     
     # Main title
     st.title("💰 Cash Flow Dashboard")
@@ -187,8 +159,26 @@ def main_dashboard():
 # Initialize auth database
 init_auth_db()
 
+# Create initial admin user if no users exist
+try:
+    import sqlite3
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM users")
+    user_count = cursor.fetchone()[0]
+    conn.close()
+    
+    if user_count == 0:
+        success, message = register_user("admin@kalonsurf.com", "Kalon2025")
+        if success:
+            st.info("Initial admin user created: admin@kalonsurf.com")
+except Exception as e:
+    pass  # Silently handle any database errors
+
 # Check authentication
-if not st.session_state.get('authenticated', False):
+if not is_authenticated():
     show_login_form()
 else:
+    # Apply theme after login (in case session state is reset)
+    apply_theme(st.session_state.get('theme', get_setting('theme', 'light')))
     main_dashboard()

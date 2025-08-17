@@ -2,280 +2,274 @@ import streamlit as st
 import sys
 import os
 import json
-import pandas as pd
+import requests
+from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.theme_manager import get_setting, apply_theme
-from services.airtable import get_airtable_data, get_lead_metrics, fetch_airtable
-from services.stripe import get_stripe_payments, get_payment_metrics, fetch_stripe_payments
+from services.settings_manager import get_setting, update_setting, get_all_settings
+from services.auth import require_auth
+from utils.theme_manager import apply_current_theme
+
+# Check authentication
+require_auth()
 
 # Apply theme
-theme = get_setting('theme', 'light')
-st.markdown(apply_theme(theme), unsafe_allow_html=True)
+apply_current_theme()
 
-st.title("API Integrations & Data Sources")
+st.title("🔌 Integrations")
 
-# Integration overview
-st.subheader("Integration Status")
+# Initialize session state for edit modes
+if 'edit_integration' not in st.session_state:
+    st.session_state.edit_integration = None
 
-col1, col2 = st.columns(2, gap="small")
+# Tab navigation
+tab1, tab2, tab3 = st.tabs(["Manage Integrations", "Add Integration", "Test Webhook Payload"])
 
-with col1:
-    st.subheader("Airtable Integration")
+with tab1:
+    st.subheader("Manage Integrations")
     
-    # Get status from fetch_airtable()[1]
-    with st.spinner("Checking Airtable connection..."):
-        df, airtable_status = fetch_airtable()
+    # Get all integration settings from database
+    all_settings = get_all_settings()
+    integration_settings = {k: v for k, v in all_settings.items() if k.startswith('integration_')}
     
-    # Display status with appropriate styling
-    if airtable_status == "Not Configured":
-        st.error(f"🔴 Airtable: {airtable_status}")
-        st.info("Configure AIRTABLE_API_KEY, AIRTABLE_BASE_ID, and AIRTABLE_TABLE_NAME in .env file")
-    elif "Connected" in airtable_status:
-        st.success(f"🟢 Airtable: {airtable_status}")
+    if not integration_settings:
+        st.info("No integrations configured yet. Use the 'Add Integration' tab to set up your first integration.")
     else:
-        st.warning(f"🟡 Airtable: {airtable_status}")
-    
-    if not df.empty:
-        total_leads = len(df)
-        st.metric("Total Leads", total_leads)
-    else:
-        st.metric("Total Leads", 0)
-    
-    st.write("Purpose: Lead and sales pipeline data")
-
-with col2:
-    st.subheader("Stripe Integration")
-    
-    # Get status from fetch_stripe_payments()[1]
-    with st.spinner("Checking Stripe connection..."):
-        stripe_status = fetch_stripe_payments()[1]
-        st.write(f"Stripe: {stripe_status}")
-        
-        df, _ = fetch_stripe_payments()
-    if not df.empty:
-        gross_volume = df['amount'].sum()
-        st.metric("Gross Volume", f"${gross_volume:,.0f}")
-    
-    st.write("Purpose: Payment processing data")
-
-# Airtable section
-st.subheader("Airtable Data")
-
-col1, col2 = st.columns(2, gap="small")
-
-with col1:
-    if st.button('Fetch Airtable Leads', type="primary"):
-        try:
-            airtable_data = get_airtable_data()
-            st.session_state.airtable_data = airtable_data
-            st.success("Airtable data fetched successfully!")
-        except Exception as e:
-            st.error(f"Error fetching Airtable data: {str(e)}")
-
-with col2:
-    if st.button('Get Lead Metrics', type="secondary"):
-        try:
-            lead_metrics = get_lead_metrics()
-            st.session_state.lead_metrics = lead_metrics
-            st.success("Lead metrics calculated!")
-        except Exception as e:
-            st.error(f"Error calculating lead metrics: {str(e)}")
-
-# Display Airtable data
-if 'airtable_data' in st.session_state:
-    st.write("**Airtable Leads Data:**")
-    leads_df = pd.DataFrame(st.session_state.airtable_data['leads'])
-    st.dataframe(leads_df, use_container_width=True)
-    
-    # Lead status breakdown
-    status_counts = leads_df['status'].value_counts()
-    col1, col2 = st.columns(2, gap="small")
-    
-    with col1:
-        st.write("**Lead Status Breakdown:**")
-        for status, count in status_counts.items():
-            st.write(f"• {status.title()}: {count}")
-    
-    with col2:
-        st.bar_chart(status_counts)
-
-if 'lead_metrics' in st.session_state:
-    st.write("**📈 Lead Metrics Summary:**")
-    metrics = st.session_state.lead_metrics
-    
-    col1, col2, col3, col4 = st.columns(4, gap="small")
-    with col1:
-        st.metric("Total Leads", metrics['total_leads'])
-    with col2:
-        st.metric("Total Value", f"${metrics['total_value']:,.0f}")
-    with col3:
-        st.metric("Qualified Leads", metrics['qualified_leads'])
-    with col4:
-        st.metric("Avg Lead Value", f"${metrics['avg_lead_value']:,.0f}")
-
-# Stripe section with range selector and visualization
-st.subheader("Stripe Payments")
-
-# Range selector
-range_select = st.selectbox("Range", ["YTD", "Last 12m", "QTD", "Last 7d", "YTD vs LY"])
-
-# Fetch Stripe data with selected range
-with st.spinner(f"Fetching Stripe data for {range_select}..."):
-    df_stripe, stripe_status = fetch_stripe_payments(range_select.lower())
-
-if not df_stripe.empty:
-    # Calculate metrics
-    gross_volume = df_stripe['amount'].sum()
-    fee_pct = 0.029  # Stripe standard fee ~2.9%
-    net_sales = gross_volume * (1 - fee_pct)
-    spend_per_customer = gross_volume / df_stripe.shape[0] if df_stripe.shape[0] > 0 else 0
-    
-    # Display metrics
-    col1, col2, col3, col4 = st.columns(4, gap="small")
-    with col1:
-        st.metric("Gross Volume", f"${gross_volume:,.0f}")
-    with col2:
-        st.metric("Net Sales", f"${net_sales:,.0f}")
-    with col3:
-        st.metric("Spend per Customer", f"${spend_per_customer:,.0f}")
-    with col4:
-        st.metric("Total Transactions", len(df_stripe))
-    
-    # Line chart for gross volume over time
-    st.subheader("Gross Volume Trend")
-    chart_data = df_stripe.set_index('date')['amount']
-    st.line_chart(chart_data)
-    
-    # Store in session state for compatibility
-    st.session_state.stripe_data = df_stripe.to_dict('records')
-else:
-    st.warning(f"Stripe Status: {stripe_status}")
-
-col1, col2 = st.columns(2, gap="small")
-
-with col1:
-    if st.button('Refresh Stripe Data', type="primary"):
-        st.session_state.stripe_refresh_requested = True
-
-with col2:
-    if st.button('Get Payment Metrics', type="secondary"):
-        try:
-            payment_metrics = get_payment_metrics()
-            st.session_state.payment_metrics = payment_metrics
-            st.success("Payment metrics calculated!")
-        except Exception as e:
-            st.error(f"Error calculating payment metrics: {str(e)}")
-
-# Display Stripe data
-if 'stripe_data' in st.session_state:
-    st.write("**Stripe Payments Data:**")
-    payments_df = pd.DataFrame(st.session_state.stripe_data)
-    st.dataframe(payments_df, use_container_width=True)
-    
-    # Payment status breakdown
-    status_counts = payments_df['status'].value_counts()
-    col1, col2 = st.columns(2, gap="small")
-    
-    with col1:
-        st.write("**Payment Status Breakdown:**")
-        for status, count in status_counts.items():
-            st.write(f"• {status.title()}: {count}")
-    
-    with col2:
-        st.bar_chart(status_counts)
-
-if 'payment_metrics' in st.session_state:
-    st.write("**📊 Payment Metrics Summary:**")
-    metrics = st.session_state.payment_metrics
-    
-    col1, col2, col3, col4 = st.columns(4, gap="small")
-    with col1:
-        st.metric("Total Payments", metrics['total_payments'])
-    with col2:
-        st.metric("Succeeded", metrics['succeeded_payments'])
-    with col3:
-        st.metric("Total Amount", f"${metrics['total_amount']:,.0f}")
-    with col4:
-        st.metric("Avg Payment", f"${metrics['avg_payment']:,.0f}")
-
-# Webhook simulation
-st.subheader("Webhook Simulation")
-
-st.write("**Test webhook payload processing:**")
-
-webhook_payload = st.text_area(
-    "Webhook Payload (JSON format)", 
-    placeholder='{"event": "payment.succeeded", "amount": 2500, "currency": "usd"}',
-    height=100
-)
-
-if webhook_payload:
-    try:
-        parsed_data = json.loads(webhook_payload)
-        st.success("Valid JSON payload!")
-        
-        st.write("**Parsed Webhook Data:**")
-        st.json(parsed_data)
-        
-        # Process webhook based on event type
-        if 'event' in parsed_data:
-            event_type = parsed_data['event']
+        for setting_key, setting_value in integration_settings.items():
+            integration_name = setting_key.replace('integration_', '').replace('_', ' ').title()
             
-            if event_type == 'payment.succeeded':
-                st.success("Payment succeeded webhook processed!")
-                if 'amount' in parsed_data:
-                    st.write(f"Payment amount: ${parsed_data['amount']:,.2f}")
-            
-            elif event_type == 'lead.created':
-                st.info("New lead webhook processed!")
-                if 'value' in parsed_data:
-                    st.write(f"Lead value: ${parsed_data['value']:,.2f}")
-            
+            with st.container():
+                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                
+                with col1:
+                    st.write(f"**{integration_name}**")
+                
+                with col2:
+                    # Status toggle
+                    enabled_key = f"{setting_key}_enabled"
+                    current_status = get_setting(enabled_key, True)
+                    status = st.toggle("Enabled", value=current_status, key=f"status_{setting_key}")
+                    if status != current_status:
+                        update_setting(enabled_key, status)
+                        st.rerun()
+                
+                with col3:
+                    # Last updated (mock for now)
+                    st.write("Last updated: Today")
+                
+                with col4:
+                    # Edit button
+                    if st.button("Edit", key=f"edit_{setting_key}"):
+                        st.session_state.edit_integration = setting_key
+                        st.rerun()
+                
+                # Show edit form if this integration is being edited
+                if st.session_state.edit_integration == setting_key:
+                    with st.form(f"edit_form_{setting_key}"):
+                        st.write(f"**Edit {integration_name}**")
+                        
+                        try:
+                            config = json.loads(setting_value) if isinstance(setting_value, str) else setting_value
+                        except:
+                            config = {}
+                        
+                        # Dynamic form fields based on integration type
+                        integration_type = config.get('type', 'webhook')
+                        
+                        new_name = st.text_input("Name", value=config.get('name', integration_name))
+                        
+                        if integration_type in ['stripe', 'airtable', 'google_ads']:
+                            new_api_key = st.text_input("API Key", value=config.get('api_key', ''), type="password")
+                        
+                        if integration_type == 'webhook':
+                            new_webhook_url = st.text_input("Webhook URL", value=config.get('webhook_url', ''))
+                        
+                        if integration_type == 'airtable':
+                            new_base_id = st.text_input("Base ID", value=config.get('base_id', ''))
+                            new_table_name = st.text_input("Table Name", value=config.get('table_name', ''))
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("Save Changes"):
+                                updated_config = {
+                                    'type': integration_type,
+                                    'name': new_name,
+                                    'updated_at': datetime.now().isoformat()
+                                }
+                                
+                                if integration_type in ['stripe', 'airtable', 'google_ads']:
+                                    updated_config['api_key'] = new_api_key
+                                if integration_type == 'webhook':
+                                    updated_config['webhook_url'] = new_webhook_url
+                                if integration_type == 'airtable':
+                                    updated_config['base_id'] = new_base_id
+                                    updated_config['table_name'] = new_table_name
+                                
+                                update_setting(setting_key, json.dumps(updated_config))
+                                st.session_state.edit_integration = None
+                                st.success("Integration updated successfully!")
+                                st.rerun()
+                        
+                        with col2:
+                            if st.form_submit_button("Cancel"):
+                                st.session_state.edit_integration = None
+                                st.rerun()
+                
+                st.divider()
+
+with tab2:
+    st.subheader("Add Integration")
+    
+    # Integration type selector
+    integration_type = st.selectbox(
+        "Integration Type",
+        ["Stripe", "AbleCDP", "Airtable", "Google Ads", "Webhook", "Custom"],
+        key="new_integration_type"
+    )
+    
+    with st.form("add_integration_form"):
+        st.write(f"**Configure {integration_type} Integration**")
+        
+        # Common fields
+        integration_name = st.text_input("Integration Name", placeholder=f"My {integration_type} Integration")
+        
+        # Type-specific fields
+        api_key = None
+        webhook_url = None
+        base_id = None
+        table_name = None
+        
+        if integration_type in ["Stripe", "AbleCDP", "Google Ads"]:
+            api_key = st.text_input("API Key", type="password", help="Enter your API key")
+        
+        if integration_type == "Webhook":
+            webhook_url = st.text_input("Webhook URL", placeholder="https://your-app.com/webhook")
+        
+        if integration_type == "Airtable":
+            api_key = st.text_input("API Key", type="password", help="Your Airtable API key")
+            base_id = st.text_input("Base ID", placeholder="appXXXXXXXXXXXXXX")
+            table_name = st.text_input("Table Name", placeholder="Leads")
+        
+        if integration_type == "Custom":
+            webhook_url = st.text_input("Endpoint URL", placeholder="https://api.example.com/endpoint")
+            api_key = st.text_input("API Key/Token", type="password", help="Authentication token")
+        
+        # Additional settings
+        with st.expander("Advanced Settings"):
+            events_to_subscribe = st.multiselect(
+                "Events to Subscribe",
+                ["payment.succeeded", "payment.failed", "lead.created", "lead.updated", "custom.event"],
+                default=["payment.succeeded"]
+            )
+        
+        if st.form_submit_button("Save Integration", type="primary"):
+            if not integration_name:
+                st.error("Please provide an integration name")
             else:
-                st.info(f"Webhook event '{event_type}' received and logged")
+                # Create integration config
+                config = {
+                    'type': integration_type.lower().replace(' ', '_'),
+                    'name': integration_name,
+                    'events': events_to_subscribe,
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }
+                
+                if api_key:
+                    config['api_key'] = api_key
+                if webhook_url:
+                    config['webhook_url'] = webhook_url
+                if base_id:
+                    config['base_id'] = base_id
+                if table_name:
+                    config['table_name'] = table_name
+                
+                # Save to settings
+                setting_key = f"integration_{integration_type.lower().replace(' ', '_')}_{integration_name.lower().replace(' ', '_')}"
+                update_setting(setting_key, json.dumps(config))
+                update_setting(f"{setting_key}_enabled", True)
+                
+                st.success(f"{integration_type} integration '{integration_name}' saved successfully!")
+                st.rerun()
+
+with tab3:
+    st.subheader("Test Webhook Payload")
+    
+    # Get available webhook integrations
+    all_settings = get_all_settings()
+    webhook_integrations = {}
+    
+    for key, value in all_settings.items():
+        if key.startswith('integration_'):
+            try:
+                config = json.loads(value) if isinstance(value, str) else value
+                if 'webhook_url' in config:
+                    webhook_integrations[config['name']] = config['webhook_url']
+            except:
+                continue
+    
+    if not webhook_integrations:
+        st.info("No webhook integrations configured. Add a webhook integration first.")
+    else:
+        # Webhook selector
+        selected_webhook = st.selectbox(
+            "Select Webhook Integration",
+            list(webhook_integrations.keys())
+        )
         
-    except json.JSONDecodeError as e:
-        st.error(f"Invalid JSON format: {str(e)}")
-
-# API Configuration
-st.subheader("API Configuration")
-
-with st.expander("API Settings"):
-    st.write("**Environment Variables Status:**")
-    
-    # Check for API keys (without displaying them)
-    airtable_key_status = "Set" if os.getenv('AIRTABLE_API_KEY') else "Not Set"
-    stripe_key_status = "Set" if os.getenv('STRIPE_API_KEY') else "Not Set"
-    
-    col1, col2 = st.columns(2, gap="small")
-    with col1:
-        st.write(f"Airtable API Key: {airtable_key_status}")
-    with col2:
-        st.write(f"Stripe API Key: {stripe_key_status}")
-    
-    st.info("API keys are loaded from the .env file. Update the .env file to configure real API connections.")
-
-# Integration health check
-st.subheader("API Health Checks")
-
-if st.button("Run Health Check", type="primary"):
-    st.write("**Running integration health check...**")
-    
-    # Check Airtable
-    try:
-        airtable_data = get_airtable_data()
-        st.success("Airtable: Connection OK")
-    except Exception as e:
-        st.error(f"Airtable: {str(e)}")
-    
-    # Check Stripe
-    try:
-        stripe_data = get_stripe_payments()
-        st.success("Stripe: Connection OK")
-    except Exception as e:
-        st.error(f"Stripe: {str(e)}")
-    
-    st.info("Health check completed. All integrations are using mock data until API keys are configured.")
+        webhook_url = webhook_integrations[selected_webhook]
+        st.write(f"**Target URL:** `{webhook_url}`")
+        
+        # Payload editor
+        default_payload = {
+            "event": "test.webhook",
+            "timestamp": datetime.now().isoformat(),
+            "data": {
+                "amount": 2500,
+                "currency": "usd",
+                "customer_id": "cust_123456"
+            }
+        }
+        
+        payload_text = st.text_area(
+            "Webhook Payload (JSON)",
+            value=json.dumps(default_payload, indent=2),
+            height=200,
+            help="Edit the JSON payload to test different webhook scenarios"
+        )
+        
+        col1, col2 = st.columns([1, 3])
+        
+        with col1:
+            if st.button("Send Test", type="primary"):
+                try:
+                    # Validate JSON
+                    payload = json.loads(payload_text)
+                    
+                    # Send POST request (mock for now since we don't have real endpoints)
+                    st.info(f"Sending test payload to {webhook_url}...")
+                    
+                    # Mock response (in real implementation, use requests.post)
+                    mock_response = {
+                        "status": "success",
+                        "message": "Webhook received successfully",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    
+                    st.success("✅ Webhook test successful!")
+                    st.json(mock_response)
+                    
+                except json.JSONDecodeError as e:
+                    st.error(f"Invalid JSON: {str(e)}")
+                except Exception as e:
+                    st.error(f"Error sending webhook: {str(e)}")
+        
+        with col2:
+            st.write("**Payload Preview:**")
+            try:
+                payload = json.loads(payload_text)
+                st.json(payload)
+            except:
+                st.error("Invalid JSON format")

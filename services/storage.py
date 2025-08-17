@@ -3,25 +3,62 @@ import pandas as pd
 import streamlit as st
 import os
 
-def init_db():
-    """Initialize SQLite database with required tables"""
+def get_db_connection():
     conn = sqlite3.connect('cashflow.db')
-    cur = conn.cursor()
+    return conn
+
+def init_db():
+    """Initialize the database with required tables."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    # Create tables if they don't exist
-    cur.execute('''CREATE TABLE IF NOT EXISTS sales_orders 
+    # Create costs table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS costs (
+            id TEXT PRIMARY KEY,
+            date TEXT,
+            category TEXT,
+            amount_expected REAL,
+            actual_amount REAL,
+            paid BOOLEAN DEFAULT FALSE,
+            comment TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Create recurring_costs table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS recurring_costs (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            category TEXT,
+            currency TEXT,
+            amount_expected REAL,
+            comment TEXT,
+            recurrence TEXT,
+            next_due_date DATE,
+            active BOOLEAN DEFAULT TRUE
+        )
+    ''')
+    
+    # Create sales_orders table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS sales_orders 
                    (date TEXT, sales_usd REAL)''')
     
-    cur.execute('''CREATE TABLE IF NOT EXISTS cash_out 
+    # Create cash_out table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS cash_out 
                    (date TEXT, costs_usd REAL, costs_crc REAL)''')
     
-    cur.execute('''CREATE TABLE IF NOT EXISTS fx_rates 
+    # Create fx_rates table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS fx_rates 
                    (month TEXT, low REAL, base REAL, high REAL)''')
     
-    cur.execute('''CREATE TABLE IF NOT EXISTS loan_payments 
+    # Create loan_payments table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS loan_payments 
                    (date TEXT, amount REAL, type TEXT)''')
     
-    cur.execute('''CREATE TABLE IF NOT EXISTS costs_monthly 
+    # Create costs_monthly table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS costs_monthly 
                    (month TEXT, category TEXT, amount REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     conn.commit()
@@ -37,6 +74,47 @@ def load_table(table_name):
     except Exception as e:
         conn.close()
         return pd.DataFrame()
+
+def get_recurring_costs():
+    """Return all recurring costs from the database."""
+    return load_table("recurring_costs")
+
+def add_recurring_cost(row_dict):
+    """Insert a new recurring cost into the database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    columns = ', '.join(row_dict.keys())
+    placeholders = ', '.join(['?' for _ in row_dict])
+    values = list(row_dict.values())
+    
+    cursor.execute(f'''
+        INSERT INTO recurring_costs ({columns})
+        VALUES ({placeholders})
+    ''', values)
+    
+    conn.commit()
+    conn.close()
+
+def update_recurring_cost(id, **fields):
+    """Update specified fields for a recurring cost by ID."""
+    if not fields:
+        return
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    set_clause = ', '.join([f"{key} = ?" for key in fields.keys()])
+    values = list(fields.values()) + [id]
+    
+    cursor.execute(f'''
+        UPDATE recurring_costs 
+        SET {set_clause}
+        WHERE id = ?
+    ''', values)
+    
+    conn.commit()
+    conn.close()
 
 def upsert_from_csv(table_name, csv_path):
     """Load CSV data into database table"""

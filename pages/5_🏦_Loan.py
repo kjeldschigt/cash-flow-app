@@ -11,9 +11,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from components.ui_helpers import render_metric_grid, create_section_header, render_chart_container
 from services.loan import Loan
+from utils.data_manager import load_combined_data, init_session_filters, filter_data_by_range, get_daily_aggregates
 from utils.theme_manager import apply_theme
 from utils.error_handler import show_error
 from services.settings_manager import get_setting
+from services.fx import get_monthly_rate
+from services.storage import load_table
+from services.auth import require_auth
+
+# Check authentication
+require_auth()
 
 # Apply theme
 theme = get_setting('theme', 'light')
@@ -134,6 +141,7 @@ try:
     remaining_years = loan.get_remaining_years()
     original_total = loan_summary['original_principal'] + (ANNUAL_INTEREST * LOAN_TERM_YEARS)
     paid_amount = loan_summary['total_payments']
+    remaining_amount = original_total - paid_amount
     progress_pct = (paid_amount / original_total * 100) if original_total > 0 else 0
     
     status_metrics = [

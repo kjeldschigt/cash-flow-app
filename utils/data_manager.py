@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
-import streamlit as st
+import sqlite3
+import os
 from datetime import datetime, timedelta
-from utils.error_handler import show_error, show_warning, validate_dataframe, ensure_dataframe_columns, Any
+from typing import Dict, Any
+from utils.error_handler import show_error, show_warning, validate_dataframe, ensure_dataframe_columns
 
 # Database path
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cashflow.db')
@@ -23,8 +25,40 @@ def load_table(table_name: str) -> pd.DataFrame:
 def load_combined_data():
     """Load and combine data from all sources with fallback handling"""
     try:
-        from services.airtable import get_combined_data
-        df = get_combined_data()
+        # Load data from sample files or database
+        try:
+            # Try to load from sample data files first
+            import os
+            data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+            
+            sales_file = os.path.join(data_dir, 'sample_sales_orders.csv')
+            costs_file = os.path.join(data_dir, 'sample_cash_out.csv')
+            
+            df_sales = pd.DataFrame()
+            df_costs = pd.DataFrame()
+            
+            if os.path.exists(sales_file):
+                df_sales = pd.read_csv(sales_file)
+                if 'Date' not in df_sales.columns and 'date' in df_sales.columns:
+                    df_sales = df_sales.rename(columns={'date': 'Date'})
+                if 'Amount' in df_sales.columns:
+                    df_sales = df_sales.rename(columns={'Amount': 'Sales_USD'})
+                df_sales['Costs_USD'] = 0
+            
+            if os.path.exists(costs_file):
+                df_costs = pd.read_csv(costs_file)
+                if 'Date' not in df_costs.columns and 'date' in df_costs.columns:
+                    df_costs = df_costs.rename(columns={'date': 'Date'})
+                if 'Amount' in df_costs.columns:
+                    df_costs = df_costs.rename(columns={'Amount': 'Costs_USD'})
+                df_costs['Sales_USD'] = 0
+            
+            # Combine dataframes
+            df = pd.concat([df_sales, df_costs], ignore_index=True)
+            
+        except Exception:
+            # Fallback to empty dataframe
+            df = pd.DataFrame()
         
         # Ensure required columns exist
         required_cols = ['Date', 'Sales_USD', 'Costs_USD']
@@ -33,6 +67,12 @@ def load_combined_data():
             'Costs_USD': 0.0,
             'Date': datetime.now()
         })
+        
+        # Clean and standardize Date column
+        if not df.empty and 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df = df.dropna(subset=['Date'])
+            df = df.sort_values('Date')
         
         return df
     except ImportError as e:
@@ -121,6 +161,158 @@ def get_session_filter(key: str, default: Any = None) -> Any:
 def clear_cache():
     """Clear all cached data"""
     st.cache_data.clear()
+
+def filter_data_by_range(df: pd.DataFrame, range_label: str) -> pd.DataFrame:
+    """Filter dataframe by date range based on label"""
+    if df.empty or 'Date' not in df.columns:
+        return df
+    
+    # Ensure Date column is datetime
+    df = df.copy()
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    df = df.dropna(subset=['Date'])
+    
+    # Calculate date range
+    end_date = datetime.now()
+    
+    if range_label == "Last 30 Days":
+        start_date = end_date - timedelta(days=30)
+    elif range_label == "Last 60 Days":
+        start_date = end_date - timedelta(days=60)
+    elif range_label == "Last 90 Days":
+        start_date = end_date - timedelta(days=90)
+    elif range_label == "Year to Date":
+        start_date = datetime(end_date.year, 1, 1)
+    elif range_label == "All Time":
+        return df
+    else:
+        # Default to last 30 days
+        start_date = end_date - timedelta(days=30)
+    
+    # Filter dataframe
+    filtered_df = df[
+        (df['Date'] >= start_date) & 
+        (df['Date'] <= end_date)
+    ]
+    
+    return filtered_df
+
+def get_daily_aggregates(df: pd.DataFrame) -> pd.DataFrame:
+    """Get daily aggregated data with Net calculation"""
+    if df.empty or 'Date' not in df.columns:
+        return pd.DataFrame(columns=['Date', 'Sales_USD', 'Costs_USD', 'Net'])
+    
+    # Ensure Date column is datetime
+    df = df.copy()
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    df = df.dropna(subset=['Date'])
+    
+    # Group by date and sum
+    daily_agg = df.groupby(df['Date'].dt.date).agg({
+        'Sales_USD': 'sum',
+        'Costs_USD': 'sum'
+    }).reset_index()
+    
+    # Convert date back to datetime
+    daily_agg['Date'] = pd.to_datetime(daily_agg['Date'])
+    
+    # Calculate Net = Sales - Costs
+    daily_agg['Net'] = daily_agg['Sales_USD'] - daily_agg['Costs_USD']
+    
+    return daily_agg.sort_values('Date')
+
+def generate_due_costs():
+    """Generate due costs from recurring costs and insert into costs table."""
+    from services.storage import get_recurring_costs, get_db_connection
+    from datetime import datetime, timedelta
+    import uuid
+    
+    try:
+        recurring_costs_df = get_recurring_costs()
+        if recurring_costs_df.empty:
+            return
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        today = datetime.now().date()
+        
+        for _, row in recurring_costs_df.iterrows():
+            if not row.get('active', True):
+                continue
+                
+            next_due_str = row.get('next_due_date')
+            if not next_due_str:
+                continue
+                
+            try:
+                next_due_date = datetime.strptime(next_due_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                continue
+                
+            if next_due_date <= today:
+                # Insert cost entry
+                cost_id = str(uuid.uuid4())
+                cursor.execute('''
+                    INSERT INTO costs (id, date, category, amount_expected, comment, paid, actual_amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (cost_id, next_due_str, row['category'], row['amount_expected'], 
+                      row.get('comment', ''), False, None))
+                
+                # Calculate next due date based on recurrence
+                recurrence = row.get('recurrence', '').lower()
+                if recurrence == 'weekly':
+                    new_due_date = next_due_date + timedelta(days=7)
+                elif recurrence == 'bi-weekly' or recurrence == 'biweekly':
+                    new_due_date = next_due_date + timedelta(days=14)
+                elif recurrence == 'monthly':
+                    # Add 1 month (approximate)
+                    if next_due_date.month == 12:
+                        new_due_date = next_due_date.replace(year=next_due_date.year + 1, month=1)
+                    else:
+                        new_due_date = next_due_date.replace(month=next_due_date.month + 1)
+                elif recurrence == 'every 2 months':
+                    # Add 2 months
+                    month = next_due_date.month + 2
+                    year = next_due_date.year
+                    if month > 12:
+                        month -= 12
+                        year += 1
+                    new_due_date = next_due_date.replace(year=year, month=month)
+                elif recurrence == 'quarterly':
+                    # Add 3 months
+                    month = next_due_date.month + 3
+                    year = next_due_date.year
+                    if month > 12:
+                        month -= 12
+                        year += 1
+                    new_due_date = next_due_date.replace(year=year, month=month)
+                elif recurrence == 'semiannual':
+                    # Add 6 months
+                    month = next_due_date.month + 6
+                    year = next_due_date.year
+                    if month > 12:
+                        month -= 12
+                        year += 1
+                    new_due_date = next_due_date.replace(year=year, month=month)
+                elif recurrence == 'annual' or recurrence == 'yearly':
+                    new_due_date = next_due_date.replace(year=next_due_date.year + 1)
+                else:
+                    continue  # Unknown recurrence, skip
+                
+                # Update next_due_date in recurring_costs
+                cursor.execute('''
+                    UPDATE recurring_costs 
+                    SET next_due_date = ?
+                    WHERE id = ?
+                ''', (new_due_date.strftime('%Y-%m-%d'), row['id']))
+        
+        conn.commit()
+        conn.close()
+        
+    except Exception as e:
+        st.error(f"Error generating due costs: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
 
 def refresh_data():
     """Refresh all cached data"""
