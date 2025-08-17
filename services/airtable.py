@@ -1,7 +1,9 @@
 import os
 import pandas as pd
-import pyairtable
+import os
+from pyairtable import Table
 from dotenv import load_dotenv
+from utils.error_handler import show_error, handle_api_error, ensure_dataframe_columns
 
 load_dotenv()
 
@@ -14,13 +16,18 @@ def fetch_airtable():
     """Fetch data from Airtable and return DataFrame with status"""
     try:
         if not all([api_key, base_id, table_name]):
-            return pd.DataFrame(), "Error: Missing Airtable credentials"
+            return pd.DataFrame(), "Not Configured"
         
         # Initialize Airtable connection
         table = pyairtable.Table(api_key, base_id, table_name)
         
-        # Fetch all records
-        records = table.all()
+        # Fetch all records with error handling
+        try:
+            records = table.all()
+        except ImportError as e:
+            return handle_api_error(e, "Airtable", pd.DataFrame()), "Module Import Error"
+        except Exception as e:
+            return handle_api_error(e, "Airtable", pd.DataFrame()), "Not Configured"
         
         if not records:
             return pd.DataFrame(), "Error: No records found"
@@ -40,7 +47,7 @@ def fetch_airtable():
         return df, status
         
     except Exception as e:
-        return pd.DataFrame(), f"Error: {str(e)}"
+        return pd.DataFrame(), "Not Configured"
 
 def get_airtable_data():
     """Fetch data from Airtable - fallback to mock data if connection fails"""
@@ -78,8 +85,11 @@ def load_combined_data():
         # Initialize Airtable connection
         table = pyairtable.Table(api_key, base_id, table_name)
         
-        # Fetch all records
-        records = table.all()
+        # Fetch all records with error handling
+        try:
+            records = table.all()
+        except Exception as e:
+            return pd.DataFrame()
         
         if not records:
             return pd.DataFrame()
@@ -113,7 +123,6 @@ def load_combined_data():
         return df
         
     except Exception as e:
-        print(f"Error in load_combined_data: {e}")
         return pd.DataFrame()
 
 def get_lead_metrics():

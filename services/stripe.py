@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import stripe
 from dotenv import load_dotenv
+from utils.error_handler import show_error, handle_api_error, ensure_dataframe_columns
 from datetime import datetime, timedelta
 import time
 
@@ -65,8 +66,12 @@ def fetch_stripe_payments(range_type="ytd"):
         status = f"Connected - {len(df)} charges, ${gross_volume:,.0f} gross volume"
         return df, status
         
+    except stripe.error.AuthenticationError as e:
+        return handle_api_error(e, "Stripe", get_mock_stripe_data(range_type)), "Authentication Error: Check API key"
+    except stripe.error.APIConnectionError as e:
+        return handle_api_error(e, "Stripe", get_mock_stripe_data(range_type)), "Connection Error: Check internet connection"
     except Exception as e:
-        return get_mock_stripe_data(range_type), f"Error: {str(e)}"
+        return handle_api_error(e, "Stripe", get_mock_stripe_data(range_type)), f"Error: {str(e)}"
 
 def get_mock_stripe_data(range_type="ytd"):
     """Generate mock Stripe data for testing"""

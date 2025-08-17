@@ -47,6 +47,7 @@ def convert_crc_costs_by_year(crc_amount, year_fx_rates):
         conversions[year] = crc_amount / rate
     return conversions
 
+@st.cache_data
 def calculate_fx_impact_table(crc_amount, year_fx_rates, base_year=1):
     """Calculate FX impact table showing costs under each rate with deltas"""
     conversions = convert_crc_costs_by_year(crc_amount, year_fx_rates)

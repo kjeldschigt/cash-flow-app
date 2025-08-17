@@ -21,33 +21,32 @@ class Loan:
     def _init_database(self):
         """Initialize database table for loan payments"""
         try:
-            conn = sqlite3.connect('cashflow.db')
-            cur = conn.cursor()
-            cur.execute('''
-                CREATE TABLE IF NOT EXISTS loan_repayments (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT NOT NULL,
-                    amount REAL NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            conn.commit()
-            conn.close()
+            with sqlite3.connect('cashflow.db') as conn:
+                cur = conn.cursor()
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS loan_repayments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                conn.commit()
         except Exception as e:
             print(f"Database initialization error: {e}")
     
     def _load_payment_history(self):
         """Load repayment history from database"""
         try:
-            conn = sqlite3.connect('cashflow.db')
-            cur = conn.cursor()
-            cur.execute('SELECT amount FROM loan_repayments ORDER BY date')
-            payments = cur.fetchall()
-            conn.close()
-            
-            self.payment_history = [amount[0] for amount in payments]
-                    
+            with sqlite3.connect('cashflow.db') as conn:
+                cur = conn.cursor()
+                cur.execute('SELECT amount FROM loan_repayments ORDER BY date')
+                payments = cur.fetchall()
+                
+                # Convert to list of amounts
+                self.payment_history = [payment[0] for payment in payments]
         except Exception as e:
+            print(f"Error loading payment history: {e}")
             # If database doesn't exist or has issues, start with empty history
             self.payment_history = []
     
@@ -66,12 +65,11 @@ class Loan:
             
             # Save to database
             try:
-                conn = sqlite3.connect('cashflow.db')
-                cur = conn.cursor()
-                cur.execute('INSERT INTO loan_repayments (date, amount) VALUES (?, ?)', 
-                           (datetime.now().isoformat(), amount))
-                conn.commit()
-                conn.close()
+                with sqlite3.connect('cashflow.db') as conn:
+                    cur = conn.cursor()
+                    cur.execute('INSERT INTO loan_repayments (date, amount) VALUES (?, ?)', 
+                               (datetime.now().isoformat(), amount))
+                    conn.commit()
                 return True
             except Exception as e:
                 print(f"Database error: {e}")

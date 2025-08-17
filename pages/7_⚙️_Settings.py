@@ -25,22 +25,13 @@ with st.container():
         help="Changes the visual theme across all pages"
     )
     
+    # Apply theme from theme manager
+    st.markdown(apply_theme(st.session_state.theme), unsafe_allow_html=True)
+    
     if theme == "Light":
         st.session_state.theme = "light"
-        st.markdown('''
-        <style>
-        .stApp { background-color: #FAFAFA; color: #333; }
-        .stSidebar { background-color: #F0F2F6; }
-        </style>
-        ''', unsafe_allow_html=True)
     else:
         st.session_state.theme = "dark"
-        st.markdown('''
-        <style>
-        .stApp { background-color: #0E1117; color: #FAFAFA; }
-        .stSidebar { background-color: #262730; }
-        </style>
-        ''', unsafe_allow_html=True)
     
     st.info(f"Current theme: **{theme}** - Applied app-wide")
 
@@ -60,13 +51,15 @@ with st.container():
             step=0.1,
             help="Default occupancy rate for calculations"
         )
+        validate_number_input(occupancy, "Occupancy Rate", min_val=0.0, max_val=100.0)
         total_leads = st.number_input(
             "Default Total Leads", 
             value=int(saved_settings.get('total_leads', 100)), 
             min_value=0, 
             step=1,
-            help="Default number of leads per period"
+            help="Default total leads count"
         )
+        validate_number_input(total_leads, "Total Leads", min_val=0)
     
     with col2:
         mql = st.number_input(
@@ -76,6 +69,7 @@ with st.container():
             step=1,
             help="Default MQL count"
         )
+        validate_number_input(mql, "MQL", min_val=0)
         sql = st.number_input(
             "Sales Qualified Leads (SQL)", 
             value=int(saved_settings.get('sql', 20)), 
@@ -83,6 +77,7 @@ with st.container():
             step=1,
             help="Default SQL count"
         )
+        validate_number_input(sql, "SQL", min_val=0)
 
 # Save business metrics to session state
 st.session_state.occupancy = occupancy
@@ -232,7 +227,7 @@ with col2:
         # Reset all values to defaults
         st.session_state.clear()
         st.success("Settings reset to defaults!")
-        st.rerun()
+        st.session_state.settings_reset = True
 
 with col3:
     if st.session_state.get('settings_saved', False):
@@ -318,7 +313,7 @@ with col2:
                         st.session_state[key] = value
                 
                 st.success("Settings imported successfully!")
-                st.rerun()
+                st.session_state.settings_imported = True
                 
         except Exception as e:
             st.error(f"Error importing settings: {str(e)}")

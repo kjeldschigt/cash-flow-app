@@ -128,30 +128,28 @@ def load_fx_rates():
 
 def insert_monthly_cost(month, category, amount):
     """Insert monthly cost data into costs_monthly table"""
-    conn = sqlite3.connect('cashflow.db')
-    cur = conn.cursor()
-    cur.execute('INSERT INTO costs_monthly (month, category, amount) VALUES (?, ?, ?)', 
-                (month, category, amount))
-    conn.commit()
-    conn.close()
+    with sqlite3.connect('cashflow.db') as conn:
+        cur = conn.cursor()
+        cur.execute('INSERT INTO costs_monthly (month, category, amount) VALUES (?, ?, ?)', 
+                    (month, category, amount))
+        conn.commit()
 
 def save_settings_to_db(settings_dict):
     """Save settings dictionary to database"""
-    conn = sqlite3.connect('cashflow.db')
-    cur = conn.cursor()
-    cur.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
-    for k, v in settings_dict.items():
-        cur.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (k, str(v)))
-    conn.commit()
-    conn.close()
+    with sqlite3.connect('cashflow.db') as conn:
+        cur = conn.cursor()
+        cur.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
+        # Batch insert all settings
+        settings_data = [(k, str(v)) for k, v in settings_dict.items()]
+        cur.executemany('INSERT OR REPLACE INTO settings VALUES (?, ?)', settings_data)
+        conn.commit()
 
 def load_settings():
     """Load settings from database"""
-    conn = sqlite3.connect('cashflow.db')
-    cur = conn.cursor()
-    cur.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
-    result = dict(cur.execute('SELECT * FROM settings').fetchall())
-    conn.close()
+    with sqlite3.connect('cashflow.db') as conn:
+        cur = conn.cursor()
+        cur.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
+        result = dict(cur.execute('SELECT * FROM settings').fetchall())
     return result
 
 def get_combined_data():
