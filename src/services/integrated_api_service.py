@@ -16,7 +16,6 @@ from src.services.api_key_resolver import (
     ResolvedAPIKey,
     APIKeySource,
 )
-from src.services.auth import get_current_user
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -29,7 +28,12 @@ class IntegratedAPIService:
 
     def __init__(self):
         """Initialize the integrated API service"""
-        current_user = get_current_user()
+        from src.security.auth import AuthManager
+        from src.services.user_service import UserService
+        # This is a simplified instantiation for service context.
+        # In a real app, UserService might need a db connection.
+        auth_manager = AuthManager(UserService(None), None) 
+        current_user = auth_manager.get_current_user()
         if not current_user:
             raise ValueError("Authentication required for API service")
 

@@ -77,7 +77,7 @@ class AuthComponents:
                 st.session_state.user = {
                     "id": user.id,
                     "email": user.email,
-                    "role": user.role.value,
+                    "role": user.role,
                     "is_authenticated": True,
                 }
                 return user

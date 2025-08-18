@@ -12,15 +12,16 @@ import pandas as pd
 from unittest.mock import Mock, patch
 import sys
 
-# Add src to Python path for imports
-src_path = os.path.join(os.path.dirname(__file__), '..', 'src')
-if src_path not in sys.path:
-    sys.path.insert(0, src_path)
+# Add project root to Python path to allow imports from 'src'
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from config.settings import Settings, DatabaseConfig, SecurityConfig
-from models.cost import Cost
-from models.user import User, UserRole
-from src.services.storage_service import init_db, get_db_connection
+from src.config.settings import Settings, DatabaseConfig, SecurityConfig
+from src.models.cost import Cost
+from src.models.user import User, UserRole
+from src.repositories.base import DatabaseConnection
+from src.services.storage_service import init_db
 
 @pytest.fixture(scope="session")
 def test_settings():
@@ -137,7 +138,8 @@ def sample_sales_data():
 @pytest.fixture
 def populated_test_db(temp_db, sample_costs_data, sample_sales_data):
     """Create populated test database"""
-    conn = sqlite3.connect(temp_db)
+    db_conn = DatabaseConnection(db_path=temp_db)
+    conn = db_conn.get_connection()
     cursor = conn.cursor()
     
     # Insert sample costs

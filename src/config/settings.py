@@ -5,7 +5,8 @@ Application settings and configuration management using Pydantic BaseSettings.
 import os
 from typing import Optional, Dict, Any, List
 from pathlib import Path
-from pydantic import Field, validator
+from pydantic import Field, field_validator, model_validator, ConfigDict, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings import BaseSettings
 from enum import Enum
 
@@ -36,8 +37,7 @@ class DatabaseConfig(BaseSettings):
         """Get absolute path to users database."""
         return str(Path(self.users_db_path).resolve())
 
-    class Config:
-        env_prefix = "DB_"
+    model_config = SettingsConfigDict(env_prefix="DB_", extra="ignore")
 
 
 class SecurityConfig(BaseSettings):
@@ -52,18 +52,16 @@ class SecurityConfig(BaseSettings):
     max_login_attempts: int = Field(default=5, env="MAX_LOGIN_ATTEMPTS")
     lockout_duration_minutes: int = Field(default=30, env="LOCKOUT_DURATION_MINUTES")
 
-    @validator("secret_key")
-    def validate_secret_key(cls, v):
-        if not v:
+    @model_validator(mode='after')
+    def validate_secret_key(self):
+        if not self.secret_key:
             import secrets
-
-            return secrets.token_urlsafe(32)
-        if len(v) < 32:
+            self.secret_key = secrets.token_urlsafe(32)
+        if len(self.secret_key) < 32:
             raise ValueError("Secret key must be at least 32 characters long")
-        return v
+        return self
 
-    class Config:
-        env_prefix = "SECURITY_"
+    model_config = SettingsConfigDict(env_prefix="SECURITY_", extra="ignore")
 
 
 class RateLimitConfig(BaseSettings):
@@ -74,8 +72,7 @@ class RateLimitConfig(BaseSettings):
     requests_per_hour: int = Field(default=1000, env="RATE_LIMIT_RPH")
     burst_limit: int = Field(default=10, env="RATE_LIMIT_BURST")
 
-    class Config:
-        env_prefix = "RATE_LIMIT_"
+    model_config = SettingsConfigDict(env_prefix="RATE_LIMIT_", extra="ignore")
 
 
 class FeatureFlags(BaseSettings):
@@ -87,8 +84,7 @@ class FeatureFlags(BaseSettings):
     audit_logging: bool = Field(default=True, env="FEATURE_AUDIT_LOGGING")
     data_encryption: bool = Field(default=True, env="FEATURE_DATA_ENCRYPTION")
 
-    class Config:
-        env_prefix = "FEATURE_"
+    model_config = SettingsConfigDict(env_prefix="FEATURE_", extra="ignore")
 
 
 class IntegrationConfig(BaseSettings):
@@ -114,8 +110,7 @@ class IntegrationConfig(BaseSettings):
             "enabled": bool(self.airtable_api_key and self.airtable_base_id),
         }
 
-    class Config:
-        env_prefix = "INTEGRATION_"
+    model_config = SettingsConfigDict(env_prefix="INTEGRATION_", extra="ignore")
 
 
 class AppConfig(BaseSettings):
@@ -128,12 +123,13 @@ class AppConfig(BaseSettings):
     page_title: str = Field(default="Cash Flow Dashboard", env="PAGE_TITLE")
     page_icon: str = Field(default="💰", env="PAGE_ICON")
 
-    @validator("log_level")
-    def validate_log_level(cls, v):
+    @model_validator(mode='after')
+    def validate_log_level(self):
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        if v.upper() not in valid_levels:
-            raise ValueError(f"Log level must be one of: {valid_levels}")
-        return v.upper()
+        if self.log_level.upper() not in valid_levels:
+            raise ValueError(f"Log level must be one of: {', '.join(valid_levels)}")
+        self.log_level = self.log_level.upper()
+        return self
 
     @property
     def is_production(self) -> bool:
@@ -143,8 +139,7 @@ class AppConfig(BaseSettings):
     def is_development(self) -> bool:
         return self.environment == Environment.DEVELOPMENT
 
-    class Config:
-        env_prefix = "APP_"
+    model_config = SettingsConfigDict(env_prefix="APP_", extra="ignore")
 
 
 class Settings(BaseSettings):
@@ -197,7 +192,8 @@ class Settings(BaseSettings):
         """Check if a feature flag is enabled."""
         return getattr(self.features, feature_name, False)
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # Allow extra fields to be ignored
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  # Allow extra fields to be ignored
+    )

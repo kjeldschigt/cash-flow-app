@@ -16,30 +16,54 @@ from ..security.pii_protection import (
 
 def setup_application_logging():
     """Setup secure logging for the entire application"""
+    try:
+        # Get environment
+        environment = os.getenv("ENVIRONMENT", "development")
 
-    # Get environment
-    environment = os.getenv("ENVIRONMENT", "development")
+        # Configure root logger level based on environment
+        log_level = logging.INFO if environment == "production" else logging.DEBUG
+        logging.basicConfig(
+            level=log_level,
+            format="%(message)s",  # Structured logging handles formatting
+            handlers=[],  # Will be configured by structured logger
+        )
 
-    # Configure root logger level based on environment
-    log_level = logging.INFO if environment == "production" else logging.DEBUG
-    logging.basicConfig(
-        level=log_level,
-        format="%(message)s",  # Structured logging handles formatting
-        handlers=[],  # Will be configured by structured logger
-    )
+        # Initialize structured logger (this sets up the global configuration)
+        structured_logger = get_structured_logger()
 
-    # Initialize structured logger (this sets up the global configuration)
-    structured_logger = get_structured_logger()
+        # Create PII filter with error handling
+        pii_filter = None
+        try:
+            pii_filter = SecureLoggingFilter()
+        except Exception as e:
+            logging.warning(f"Failed to initialize PII filter: {e}")
+            pii_filter = logging.Filter()  # Fallback to no-op filter
 
-    # Add PII filter to all existing handlers
-    pii_filter = SecureLoggingFilter()
+        # Only apply PII filter to our application loggers, not the root logger
+        app_loggers = [
+            'cashflowapp',
+            'src',
+            'services',
+            'security',
+            'models',
+            'repositories',
+            'utils',
+            'api',
+            'ui'
+        ]
 
-    # Apply filter to root logger and all handlers
-    root_logger = logging.getLogger()
-    root_logger.addFilter(pii_filter)
+        # Apply filter to application loggers
+        for logger_name in app_loggers:
+            logger = logging.getLogger(logger_name)
+            logger.addFilter(pii_filter)
+            
+            # Also apply to any existing handlers of these loggers
+            for handler in logger.handlers:
+                handler.addFilter(pii_filter)
 
-    for handler in root_logger.handlers:
-        handler.addFilter(pii_filter)
+    except Exception as e:
+        logging.error(f"Error setting up application logging: {e}", exc_info=True)
+        raise
 
     # Configure specific loggers for different components
     component_loggers = [

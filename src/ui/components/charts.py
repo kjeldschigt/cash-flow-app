@@ -670,3 +670,54 @@ def render_kpi_sparklines(kpis: Dict[str, pd.Series]):
             )
 
             st.plotly_chart(fig, use_container_width=True)
+
+
+class ChartComponents:
+    """Main chart components class that aggregates all chart types"""
+    
+    def __init__(self):
+        self.base_chart = BaseChart()
+        self.cash_flow_chart = CashFlowChart()
+        self.revenue_breakdown_pie_chart = RevenueBreakdownPieChart()
+        self.forecast_line_chart = ForecastLineChart()
+        self.scenario_comparison_chart = ScenarioComparisonChart()
+        self.waterfall_chart = WaterfallChart()
+        self.heatmap_chart = HeatmapChart()
+    
+    # Cash Flow Charts
+    def create_cash_flow_chart(self, data: pd.DataFrame, title: str = "Cash Flow Analysis", **kwargs):
+        """Create interactive cash flow chart"""
+        return self.cash_flow_chart.create_chart(data, title, **kwargs)
+    
+    # Revenue Charts
+    def create_revenue_pie_chart(self, data: Dict[str, float], title: str = "Revenue Breakdown", **kwargs):
+        """Create revenue breakdown pie chart"""
+        return self.revenue_breakdown_pie_chart.create_chart(data, title, **kwargs)
+    
+    # Forecast Charts
+    def create_forecast_chart(self, historical_data: pd.DataFrame, forecast_data: pd.DataFrame, 
+                            title: str = "Financial Forecast", **kwargs):
+        """Create forecast line chart with confidence bands"""
+        return self.forecast_line_chart.create_chart(historical_data, forecast_data, title, **kwargs)
+    
+    # Scenario Analysis
+    def create_scenario_comparison(self, scenarios: Dict[str, pd.DataFrame], 
+                                 title: str = "Scenario Comparison", **kwargs):
+        """Create scenario comparison chart"""
+        return self.scenario_comparison_chart.create_chart(scenarios, title, **kwargs)
+    
+    # Waterfall Charts
+    def create_waterfall_chart(self, categories: List[str], values: List[float], 
+                             title: str = "Waterfall Analysis", **kwargs):
+        """Create waterfall chart for cumulative effects"""
+        return self.waterfall_chart.create_chart(categories, values, title, **kwargs)
+    
+    # Heatmap Charts
+    def create_heatmap(self, data: pd.DataFrame, title: str = "Correlation Heatmap", **kwargs):
+        """Create heatmap for correlation analysis"""
+        return self.heatmap_chart.create_chart(data, title, **kwargs)
+    
+    # Utility methods
+    def apply_theme(self, fig: go.Figure, title: str = None) -> go.Figure:
+        """Apply consistent theme to any chart"""
+        return self.base_chart._apply_theme(fig, title)

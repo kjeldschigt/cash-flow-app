@@ -9,11 +9,11 @@ import os
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
-from src.security.auth import AuthManager, RoleManager
+from src.security.auth import AuthManager, RoleBasedAccessControl
 from src.security.encryption import DataEncryption, SecureStorage
 from src.security.audit import AuditLogger, AuditAction, AuditLevel
 from src.utils.secrets_manager import SecretsManager, SecretProvider
-from src.models.user import UserModel, UserRole
+from src.models.user import User, UserRole
 from src.repositories.base import DatabaseConnection
 
 class TestAuthenticationSecurity:
@@ -22,29 +22,38 @@ class TestAuthenticationSecurity:
     @pytest.fixture
     def auth_manager(self):
         """Create test auth manager"""
-        db_connection = Mock(spec=DatabaseConnection)
-        return AuthManager(db_connection)
+        from src.config.settings import Settings
+        user_service = Mock()
+        settings = Settings()
+        return AuthManager(user_service, settings)
     
     @pytest.fixture
-    def role_manager(self):
-        """Create test role manager"""
-        db_connection = Mock(spec=DatabaseConnection)
-        return RoleManager(db_connection)
+    def rbac(self):
+        """Create test RBAC instance"""
+        return RoleBasedAccessControl()
     
-    def test_password_hashing_security(self, auth_manager):
-        """Test secure password hashing"""
-        password = "TestPassword123!"
+    def test_authentication_security(self, auth_manager):
+        """Test secure authentication"""
+        # Create a test user
+        from src.models.user import User
+        test_user = User.create(
+            email="test@example.com",
+            password="TestPassword123!",
+            role=UserRole.USER
+        )
         
-        # Hash password
-        hashed = auth_manager._hash_password(password)
+        # Mock the user service to return our test user
+        auth_manager.user_service.authenticate_with_identifier.return_value = test_user
         
-        # Verify hash is different from original
-        assert hashed != password
-        assert len(hashed) > 50  # bcrypt hashes are long
+        # Test successful authentication
+        result = auth_manager.authenticate_user("test@example.com", "TestPassword123!")
+        assert result is not None
+        assert result.email == "test@example.com"
         
-        # Verify password verification works
-        assert auth_manager._verify_password(password, hashed)
-        assert not auth_manager._verify_password("wrong_password", hashed)
+        # Test failed authentication
+        auth_manager.user_service.authenticate_with_identifier.return_value = None
+        result = auth_manager.authenticate_user("test@example.com", "WrongPassword!")
+        assert result is None
     
     def test_session_security(self, auth_manager):
         """Test session management security"""
@@ -66,17 +75,21 @@ class TestAuthenticationSecurity:
         assert session_user is not None
         assert session_user.email == user.email
     
-    def test_role_based_permissions(self, role_manager):
-        """Test RBAC permissions"""
+    def test_role_based_access(self, auth_manager, rbac):
+        """Test role-based access control"""
+        from src.models.user import UserRole
+        
         # Test admin permissions
-        admin_permissions = role_manager.get_role_permissions(UserRole.ADMIN)
-        assert "manage_users" in admin_permissions
-        assert "view_audit_logs" in admin_permissions
+        assert rbac.has_permission(UserRole.ADMIN, "manage_users") is True
+        assert rbac.has_permission(UserRole.ADMIN, "view_dashboard") is True
+        
+        # Test manager permissions
+        assert rbac.has_permission(UserRole.MANAGER, "manage_users") is False
+        assert rbac.has_permission(UserRole.MANAGER, "view_analytics") is True
         
         # Test user permissions
-        user_permissions = role_manager.get_role_permissions(UserRole.USER)
-        assert "view_dashboard" in user_permissions
-        assert "manage_users" not in user_permissions
+        assert rbac.has_permission(UserRole.USER, "view_dashboard") is True
+        assert rbac.has_permission(UserRole.USER, "manage_integrations") is False
     
     def test_account_lockout_security(self, auth_manager):
         """Test account lockout after failed attempts"""

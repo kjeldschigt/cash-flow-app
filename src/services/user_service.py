@@ -140,6 +140,16 @@ class UserService:
         self.user_repository.save(updated_user)
         return True
 
+    def create_user(self, user: User, password: str) -> User:
+        """Create a new user with password."""
+        # Set the password hash
+        user.set_password(password)
+        return self.user_repository.save(user)
+
+    def count(self) -> int:
+        """Count total number of users."""
+        return self.user_repository.count()
+
     def has_permission(self, user_id: str, required_role: UserRole) -> bool:
         """Check if user has required permission level."""
         user = self.user_repository.find_by_id(user_id)

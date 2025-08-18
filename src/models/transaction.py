@@ -6,7 +6,9 @@ from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict, field_serializer
+from pydantic_core.core_schema import FieldValidationInfo
+from typing import Optional, Dict, Any
 
 
 class TransactionType(Enum):
@@ -45,28 +47,31 @@ class TransactionModel(BaseModel):
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
 
-    @validator("currency")
-    def validate_currency(cls, v):
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, v: str) -> str:
         """Validate currency code"""
         valid_currencies = ["USD", "CRC", "EUR", "GBP", "CAD"]
         if v.upper() not in valid_currencies:
             raise ValueError(f"Currency must be one of: {valid_currencies}")
         return v.upper()
 
-    @validator("transaction_date")
-    def validate_date(cls, v):
+    @field_validator("transaction_date")
+    @classmethod
+    def validate_date(cls, v: date) -> date:
         """Validate transaction date is not in future"""
         if v > date.today():
             raise ValueError("Transaction date cannot be in the future")
         return v
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             date: lambda v: v.isoformat(),
             Decimal: lambda v: float(v),
         }
+    )
 
 
 class RevenueModel(BaseModel):
@@ -85,29 +90,31 @@ class RevenueModel(BaseModel):
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
 
-    @validator("currency")
-    def validate_currency(cls, v):
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, v: str) -> str:
         """Validate currency code"""
         valid_currencies = ["USD", "CRC", "EUR", "GBP", "CAD"]
         if v.upper() not in valid_currencies:
             raise ValueError(f"Currency must be one of: {valid_currencies}")
         return v.upper()
 
-    @validator("net_amount", always=True)
-    def calculate_net_amount(cls, v, values):
+    @model_validator(mode='before')
+    @classmethod
+    def calculate_net_amount(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate net amount after tax"""
-        if "amount" in values and "tax_rate" in values:
+        if "amount" in values and "tax_rate" in values and "net_amount" not in values:
             amount = values["amount"]
-            tax_rate = values.get("tax_rate", 0)
-            if tax_rate:
-                return amount * (1 - tax_rate)
-            return amount
-        return v
+            tax_rate = values.get("tax_rate", Decimal("0.0"))
+            tax = amount * (tax_rate / 100)
+            values["net_amount"] = amount + tax
+        return values
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             date: lambda v: v.isoformat(),
             Decimal: lambda v: float(v),
         }
+    )

@@ -6,7 +6,8 @@ from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict, field_serializer
+from pydantic_core.core_schema import FieldValidationInfo
 
 
 class ForecastType(Enum):
@@ -41,28 +42,32 @@ class ForecastModel(BaseModel):
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
 
-    @validator("end_date")
-    def validate_date_range(cls, v, values):
+    @field_validator("end_date")
+    @classmethod
+    def validate_date_range(cls, v: date, info: FieldValidationInfo) -> date:
         """Validate end date is after start date"""
-        if "start_date" in values and v <= values["start_date"]:
+        data = info.data
+        if "start_date" in data and v <= data["start_date"]:
             raise ValueError("End date must be after start date")
         return v
 
-    @validator("currency")
-    def validate_currency(cls, v):
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, v: str) -> str:
         """Validate currency code"""
         valid_currencies = ["USD", "CRC", "EUR", "GBP", "CAD"]
         if v.upper() not in valid_currencies:
             raise ValueError(f"Currency must be one of: {valid_currencies}")
         return v.upper()
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             date: lambda v: v.isoformat(),
             Decimal: lambda v: float(v),
         }
+    )
 
 
 class LoanType(Enum):
@@ -106,43 +111,51 @@ class LoanModel(BaseModel):
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
 
-    @validator("currency")
-    def validate_currency(cls, v):
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, v: str) -> str:
         """Validate currency code"""
         valid_currencies = ["USD", "CRC", "EUR", "GBP", "CAD"]
         if v.upper() not in valid_currencies:
             raise ValueError(f"Currency must be one of: {valid_currencies}")
         return v.upper()
 
-    @validator("monthly_payment", always=True)
-    def calculate_monthly_payment(cls, v, values):
+    @model_validator(mode='after')
+    def calculate_monthly_payment(self) -> 'LoanModel':
         """Calculate monthly payment if not provided"""
-        if v is None and all(
-            k in values for k in ["principal_amount", "interest_rate", "term_months"]
+        if self.monthly_payment is None and all(
+            hasattr(self, field)
+            for field in ["principal_amount", "interest_rate", "term_months"]
         ):
-            principal = values["principal_amount"]
-            rate = values["interest_rate"] / 12  # Monthly rate
-            months = values["term_months"]
+            principal = self.principal_amount
+            rate = self.interest_rate / 12  # Monthly rate
+            months = self.term_months
 
             if rate > 0:
-                # Standard loan payment formula
+                # Amortization formula
                 monthly_payment = (
                     principal
                     * (rate * (1 + rate) ** months)
                     / ((1 + rate) ** months - 1)
                 )
-                return monthly_payment
+                self.monthly_payment = monthly_payment
             else:
-                # Interest-free loan
-                return principal / months
-        return v
+                # No interest, simple division
+                self.monthly_payment = principal / months
+        return self
 
-    @validator("remaining_balance", always=True)
-    def set_initial_balance(cls, v, values):
+    @field_validator("remaining_balance", mode='before')
+    @classmethod
+    def set_initial_balance(
+        cls, 
+        v: Optional[Decimal], 
+        info: FieldValidationInfo
+    ) -> Decimal:
         """Set initial remaining balance to principal amount"""
-        if v is None and "principal_amount" in values:
-            return values["principal_amount"]
-        return v
+        data = info.data
+        if v is None and "principal_amount" in data:
+            return data["principal_amount"]
+        return v or Decimal("0.0")
 
     def calculate_amortization_schedule(self) -> List[dict]:
         """Calculate loan amortization schedule"""
@@ -174,10 +187,11 @@ class LoanModel(BaseModel):
 
         return schedule
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={
             datetime: lambda v: v.isoformat(),
             date: lambda v: v.isoformat(),
             Decimal: lambda v: float(v),
         }
+    )

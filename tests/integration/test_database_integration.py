@@ -122,7 +122,7 @@ class TestDatabaseIntegration:
             'amount_expected': Decimal('2000.00'),
             'amount_actual': None,
             'comment': 'Office rent payment',
-            'recurrence': 'monthly',
+            'recurrence_pattern': 'monthly',
             'due_date': date(2024, 9, 1),
             'status': 'scheduled'
         }

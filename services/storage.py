@@ -35,7 +35,7 @@ def init_db():
             currency TEXT,
             amount_expected REAL,
             comment TEXT,
-            recurrence TEXT,
+            recurrence_pattern TEXT,
             next_due_date DATE,
             active BOOLEAN DEFAULT TRUE
         )
@@ -71,7 +71,7 @@ def init_db():
             amount_expected REAL,
             amount_actual REAL,
             comment TEXT,
-            recurrence TEXT,
+            recurrence_pattern TEXT,
             due_date DATE,
             status TEXT DEFAULT 'scheduled'
         )

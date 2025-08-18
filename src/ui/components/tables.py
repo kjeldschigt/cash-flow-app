@@ -4,8 +4,11 @@ Interactive Table Components for Cash Flow Dashboard
 
 import streamlit as st
 import pandas as pd
-from typing import Dict, List, Any, Optional, Callable, Union
+from typing import Dict, List, Any, Optional, Union, Tuple, Callable
+import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import numpy as np
 import io
 import base64
 
@@ -702,3 +705,44 @@ def render_comparison_table(
         st.dataframe(comparison_df, use_container_width=True)
 
         BaseTable._add_export_functionality(comparison_df, "period_comparison")
+
+
+class TableComponents:
+    """Main table components class that aggregates all table types"""
+    
+    def __init__(self):
+        self.base_table = BaseTable()
+        self.transaction_table = TransactionTable()
+        self.cost_breakdown_table = CostBreakdownTable()
+        self.forecast_table = ForecastTable()
+        self.pivot_table = PivotTable()
+    
+    # Transaction Tables
+    def render_transaction_table(self, data: pd.DataFrame, **kwargs):
+        """Render advanced transaction table with filtering and pagination"""
+        return self.transaction_table.render(data, **kwargs)
+    
+    # Cost Tables
+    def render_cost_breakdown_table(self, data: pd.DataFrame, **kwargs):
+        """Render cost breakdown table with drill-down capability"""
+        return self.cost_breakdown_table.render(data, **kwargs)
+    
+    # Forecast Tables
+    def render_forecast_table(self, data: pd.DataFrame, **kwargs):
+        """Render forecast table with editable scenarios"""
+        return self.forecast_table.render(data, **kwargs)
+    
+    # Pivot Tables
+    def render_pivot_table(self, data: pd.DataFrame, **kwargs):
+        """Render interactive pivot table"""
+        return self.pivot_table.render(data, **kwargs)
+    
+    # Utility methods
+    def add_export_functionality(self, data: pd.DataFrame, filename: str = "export"):
+        """Add export functionality to any table"""
+        return self.base_table._add_export_functionality(data, filename)
+    
+    def render_comparison_table(self, data1: pd.DataFrame, data2: pd.DataFrame, 
+                              labels: List[str] = ["Period 1", "Period 2"]):
+        """Render period comparison table"""
+        return self.base_table.render_comparison_table(data1, data2, labels)

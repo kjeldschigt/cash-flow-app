@@ -8,7 +8,6 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 from ..middleware.session_middleware import get_session_middleware
-from ..services.user_service import UserService
 from ..repositories.base import DatabaseConnection
 from ..models.user import User, UserRole
 from ..security.pii_protection import get_structured_logger
@@ -22,7 +21,14 @@ class EnhancedAuthComponents:
     def __init__(self):
         self.session_middleware = get_session_middleware()
         self.db_connection = DatabaseConnection()
-        self.user_service = UserService(self.db_connection)
+        self._user_service = None
+
+    @property
+    def user_service(self):
+        if self._user_service is None:
+            from ..services.user_service import UserService
+            self._user_service = UserService(self.db_connection)
+        return self._user_service
 
     def show_login_form(self) -> bool:
         """
@@ -273,7 +279,7 @@ class EnhancedAuthComponents:
 
         # Check role permissions
         user_role = UserRole(session_data.role)
-        if user_role.value < min_role.value:
+        if user_role.level < min_role.level:
             st.error(
                 f"❌ {min_role.value.title()} role required. You have {user_role.value} role."
             )

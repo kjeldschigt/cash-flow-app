@@ -79,37 +79,19 @@ try:
     settings = Settings()
     container = configure_container(settings)
     
-    # Make sure container is properly configured
-    if not hasattr(container, '_db_connection') or container._db_connection is None:
-        container.configure(settings)
-    
     # Initialize settings service
     settings_service = container.get_settings_service()
     def get_setting(key, default=None):
         try:
             return settings_service.get_setting(key, default)
-        except (TypeError, AttributeError):
+        except TypeError:
             # Fallback for repositories that don't accept default parameter
-            try:
-                result = settings_service.get_setting(key)
-                return result if result is not None else default
-            except Exception:
-                return default
+            result = settings_service.get_setting(key)
+            return result if result is not None else default
     
     # Initialize security components
-    try:
-        db_connection = container.get_db_connection()
-        audit_logger = AuditLogger(db_connection)
-        secure_storage = SecureStorage()
-    except Exception as e:
-        logger.error(f"Failed to initialize security components: {e}")
-        # Fallback to basic logging if audit logging fails
-        class FallbackAuditLogger:
-            def log_financial_operation(self, *args, **kwargs):
-                logger.warning("Audit logging not available: %s", str(e))
-        
-        audit_logger = FallbackAuditLogger()
-        secure_storage = SecureStorage()
+    audit_logger = AuditLogger(container.get_db_connection())
+    secure_storage = SecureStorage()
     
     logger.info("Application components initialized successfully")
     

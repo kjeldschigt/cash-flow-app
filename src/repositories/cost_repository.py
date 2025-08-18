@@ -117,7 +117,7 @@ class RecurringCostRepository(BaseRepository[RecurringCost]):
             currency=row["currency"],
             amount_expected=Decimal(str(row["amount_expected"])),
             comment=row["comment"],
-            recurrence=row["recurrence"],
+            recurrence_pattern=row["recurrence"],  # Alias will handle the mapping
             next_due_date=date.fromisoformat(row["next_due_date"]),
             is_active=bool(row.get("is_active", True)),
             created_at=(
@@ -141,7 +141,7 @@ class RecurringCostRepository(BaseRepository[RecurringCost]):
             "currency": model.currency,
             "amount_expected": float(model.amount_expected),
             "comment": model.comment,
-            "recurrence": model.recurrence,
+            "recurrence": model.recurrence_pattern,  # Keep using alias for backward compatibility
             "next_due_date": model.next_due_date.isoformat(),
             "is_active": model.is_active,
             "created_at": model.created_at.isoformat() if model.created_at else None,

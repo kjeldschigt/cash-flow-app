@@ -4,8 +4,7 @@ Reusable Metric Components for Cash Flow Dashboard
 
 import streamlit as st
 import plotly.graph_objects as go
-from typing import Optional, Dict, Any, Union
-from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, Union, List
 import pandas as pd
 
 
@@ -534,3 +533,61 @@ def render_cost_breakdown_metrics(
 
     if metrics:
         KPIGrid.render(metrics, columns=min(len(metrics), 4))
+
+
+class MetricsComponents:
+    """Main metrics components class that aggregates all metric types"""
+    
+    def __init__(self):
+        self.metric_card = MetricCard()
+        self.revenue_metric_card = RevenueMetricCard()
+        self.cost_metric_card = CostMetricCard()
+        self.profit_margin_card = ProfitMarginCard()
+        self.trend_indicator = TrendIndicator()
+        self.kpi_grid = KPIGrid()
+        self.financial_summary_card = FinancialSummaryCard()
+        self.cash_flow_indicator = CashFlowIndicator()
+    
+    # Metric Cards
+    def render_metric_card(self, title: str, value: Union[str, float], **kwargs):
+        """Render a basic metric card"""
+        return self.metric_card.render(title, value, **kwargs)
+    
+    def render_revenue_card(self, title: str, value: float, **kwargs):
+        """Render a revenue-specific metric card"""
+        return self.revenue_metric_card.render(title, value, **kwargs)
+    
+    def render_cost_card(self, title: str, value: float, **kwargs):
+        """Render a cost-specific metric card"""
+        return self.cost_metric_card.render(title, value, **kwargs)
+    
+    def render_profit_margin_card(self, title: str, margin: float, **kwargs):
+        """Render a profit margin card with color indicators"""
+        return self.profit_margin_card.render(title, margin, **kwargs)
+    
+    # Indicators and Trends
+    def render_trend_indicator(self, current_value: float, previous_value: float, **kwargs):
+        """Render trend indicator with arrows and colors"""
+        return self.trend_indicator.render(current_value, previous_value, **kwargs)
+    
+    def render_cash_flow_indicator(self, cash_flow: float, **kwargs):
+        """Render cash flow status indicator"""
+        return self.cash_flow_indicator.render(cash_flow, **kwargs)
+    
+    # Grid Layouts
+    def render_kpi_grid(self, metrics: List[Dict], **kwargs):
+        """Render KPI metrics in a grid layout"""
+        return self.kpi_grid.render(metrics, **kwargs)
+    
+    def render_financial_summary(self, financial_data: Dict, **kwargs):
+        """Render comprehensive financial summary"""
+        return self.financial_summary_card.render(financial_data, **kwargs)
+    
+    # Convenience methods
+    def render_revenue_metrics(self, data: Dict[str, Any], currency: str = "USD", period: str = "month"):
+        """Render standard revenue metrics"""
+        return render_revenue_metrics(data, currency, period)
+    
+    def render_cost_breakdown_metrics(self, data: Dict[str, Any], currency: str = "USD", period: str = "month"):
+        """Render cost breakdown metrics"""
+        return render_cost_breakdown_metrics(data, currency, period)

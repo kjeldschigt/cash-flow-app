@@ -48,7 +48,7 @@ form_data = FormComponents.payment_schedule_form()
 if form_data:
     try:
         # Convert form data to proper types
-        recurrence_type = RecurrenceType(form_data["recurrence"].value)
+        recurrence_type = RecurrenceType(form_data["recurrence_pattern"].value)
         category = form_data["category"]
 
         # Create payment schedule using service
@@ -57,7 +57,7 @@ if form_data:
             category=category.value,
             currency=form_data["currency"],
             amount_expected=form_data["amount_expected"],
-            recurrence=recurrence_type,
+            recurrence_pattern=recurrence_type,
             due_date=form_data["due_date"],
             comment=form_data["comment"],
         )

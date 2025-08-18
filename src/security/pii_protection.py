@@ -11,15 +11,18 @@ from typing import Dict, List, Optional, Set, Any, Union
 from dataclasses import dataclass
 from enum import Enum
 
-try:
-    from presidio_analyzer import AnalyzerEngine
-    from presidio_anonymizer import AnonymizerEngine
-    from presidio_analyzer.nlp_engine import NlpEngineProvider
+# Temporarily disable Presidio to fix infinite recursion issue
+PRESIDIO_AVAILABLE = False
 
-    PRESIDIO_AVAILABLE = True
-except ImportError:
-    PRESIDIO_AVAILABLE = False
-    logging.warning("Presidio not available. Using fallback PII detection.")
+# try:
+#     from presidio_analyzer import AnalyzerEngine
+#     from presidio_anonymizer import AnonymizerEngine
+#     from presidio_analyzer.nlp_engine import NlpEngineProvider
+#
+#     PRESIDIO_AVAILABLE = True
+# except ImportError:
+#     PRESIDIO_AVAILABLE = False
+#     logging.warning("Presidio not available. Using fallback PII detection.")
 
 
 class SensitivityLevel(str, Enum):
@@ -43,21 +46,25 @@ class PIIPattern:
 
 
 class EnhancedPIIDetector:
-    """Enhanced PII detection using Presidio with custom patterns"""
+    """Enhanced PII detection using custom patterns (Presidio temporarily disabled)"""
+    
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        """Singleton pattern to prevent multiple initializations"""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
-        self.presidio_available = PRESIDIO_AVAILABLE
+        # Only initialize once
+        if self._initialized:
+            return
+            
+        self.presidio_available = False  # Temporarily disabled
         self.analyzer = None
         self.anonymizer = None
-
-        if self.presidio_available:
-            try:
-                # Initialize Presidio engines
-                self.analyzer = AnalyzerEngine()
-                self.anonymizer = AnonymizerEngine()
-            except Exception as e:
-                logging.warning(f"Failed to initialize Presidio: {e}")
-                self.presidio_available = False
 
         # Custom PII patterns for fallback and enhancement
         self.custom_patterns = self._initialize_custom_patterns()
@@ -65,6 +72,8 @@ class EnhancedPIIDetector:
         # Compiled regex patterns for performance
         self._compiled_patterns = {}
         self._compile_patterns()
+        
+        self._initialized = True
 
     def _initialize_custom_patterns(self) -> List[PIIPattern]:
         """Initialize comprehensive PII patterns"""
@@ -311,26 +320,61 @@ class EnhancedPIIDetector:
 
 
 class SecureLoggingFilter(logging.Filter):
-    """Logging filter that automatically redacts PII and sensitive data"""
+    """
+    Logging filter that automatically redacts PII and sensitive data.
+    
+    This filter is designed to be used with application loggers, not the root logger,
+    to prevent recursive anonymization issues.
+    """
+    _initialized = False
+    _error_logged = False
 
     def __init__(self, pii_detector: Optional[EnhancedPIIDetector] = None):
         super().__init__()
-        self.pii_detector = pii_detector or EnhancedPIIDetector()
+        self._pii_detector = None
         self.environment = os.getenv("ENVIRONMENT", "development")
+        
+        try:
+            self._pii_detector = pii_detector or EnhancedPIIDetector()
+            self._initialized = True
+        except Exception as e:
+            # Only log the error once to prevent log spam
+            if not self._error_logged:
+                print(f"Warning: Failed to initialize PII detector: {e}")
+                self._error_logged = True
+            self._pii_detector = None
+            
+    def _safe_mask(self, text: str) -> str:
+        """Safely apply PII masking with error handling"""
+        if not self._pii_detector or not text or not isinstance(text, str):
+            return text
+            
+        try:
+            return self._pii_detector.mask_pii(text)
+        except Exception as e:
+            # Only log the error once to prevent log spam
+            if not self._error_logged:
+                print(f"Warning: PII masking failed: {e}")
+                self._error_logged = True
+            return text
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Filter and redact sensitive information from log records"""
+        # Skip if PII detector failed to initialize
+        if not self._initialized:
+            return True
+            
         try:
             # Redact the main message
             if hasattr(record, "msg") and record.msg:
-                record.msg = self.pii_detector.mask_pii(str(record.msg))
+                record.msg = self._safe_mask(str(record.msg))
 
-            # Redact arguments
+            # Redact arguments if they exist
             if hasattr(record, "args") and record.args:
                 cleaned_args = []
                 for arg in record.args:
                     if isinstance(arg, str):
-                        cleaned_args.append(self.pii_detector.mask_pii(arg))
+                        cleaned_args.append(self._safe_mask(arg))
                     elif isinstance(arg, dict):
                         cleaned_args.append(self._clean_dict(arg))
                     else:
@@ -339,42 +383,58 @@ class SecureLoggingFilter(logging.Filter):
 
             # In production, never log full tracebacks for exceptions
             if self.environment == "production" and record.exc_info:
-                # Keep exception type and message, but remove traceback
-                exc_type, exc_value, exc_traceback = record.exc_info
-                if exc_value:
-                    record.msg = f"{record.msg} | Exception: {exc_type.__name__}: {str(exc_value)}"
-                record.exc_info = None
-                record.exc_text = None
+                try:
+                    # Keep exception type and message, but remove traceback
+                    exc_type, exc_value, _ = record.exc_info
+                    if exc_value:
+                        safe_msg = self._safe_mask(str(record.msg))
+                        safe_exc = self._safe_mask(str(exc_value))
+                        record.msg = f"{safe_msg} | Exception: {exc_type.__name__}: {safe_exc}"
+                    record.exc_info = None
+                    record.exc_text = None
+                except Exception as e:
+                    if not self._error_logged:
+                        print(f"Warning: Error processing exception in log record: {e}")
+                        self._error_logged = True
 
         except Exception as e:
-            # If filtering fails, log the error but don't break logging
-            print(f"Logging filter error: {e}")
+            # If filtering fails, log the error once and continue
+            if not self._error_logged:
+                print(f"Warning: Error in log filtering: {e}")
+                self._error_logged = True
 
         return True
 
     def _clean_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Clean sensitive data from dictionary"""
-        if not isinstance(data, dict):
+        if not isinstance(data, dict) or not self._initialized:
             return data
 
         cleaned = {}
         for key, value in data.items():
-            if self.pii_detector.is_sensitive_field(key):
-                cleaned[key] = "{{REDACTED}}"
-            elif isinstance(value, str):
-                cleaned[key] = self.pii_detector.mask_pii(value)
-            elif isinstance(value, dict):
-                cleaned[key] = self._clean_dict(value)
-            elif isinstance(value, list):
-                cleaned[key] = [
-                    (
-                        self.pii_detector.mask_pii(item)
-                        if isinstance(item, str)
-                        else self._clean_dict(item) if isinstance(item, dict) else item
-                    )
-                    for item in value
-                ]
-            else:
+            try:
+                if self._pii_detector and self._pii_detector.is_sensitive_field(key):
+                    cleaned[key] = "{{REDACTED}}"
+                elif isinstance(value, str):
+                    cleaned[key] = self._safe_mask(value)
+                elif isinstance(value, dict):
+                    cleaned[key] = self._clean_dict(value)
+                elif isinstance(value, list):
+                    cleaned[key] = [
+                        (
+                            self._safe_mask(item)
+                            if isinstance(item, str)
+                            else self._clean_dict(item) if isinstance(item, dict) else item
+                        )
+                        for item in value
+                    ]
+                else:
+                    cleaned[key] = value
+            except Exception as e:
+                # If we can't process a value, keep the original
+                if not self._error_logged:
+                    print(f"Warning: Error cleaning dictionary value for key '{key}': {e}")
+                    self._error_logged = True
                 cleaned[key] = value
 
         return cleaned
@@ -382,16 +442,30 @@ class SecureLoggingFilter(logging.Filter):
 
 class StructuredLogger:
     """Structured logging setup with PII protection"""
+    
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, service_name: str = "cash_flow_dashboard"):
+        """Singleton pattern to prevent multiple logging setups"""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self, service_name: str = "cash_flow_dashboard"):
+        # Only initialize once
+        if self._initialized:
+            return
+            
         self.service_name = service_name
-        self.pii_detector = EnhancedPIIDetector()
+        self.pii_detector = None  # Initialize lazily to prevent recursion
         self.environment = os.getenv("ENVIRONMENT", "development")
         self._setup_logging()
+        self._initialized = True
 
     def _setup_logging(self):
-        """Setup structured logging with PII protection"""
-        # Configure structlog
+        """Setup structured logging without PII protection to prevent recursion"""
+        # Configure structlog without PII filtering to prevent recursion
         structlog.configure(
             processors=[
                 structlog.stdlib.filter_by_level,
@@ -410,16 +484,11 @@ class StructuredLogger:
             cache_logger_on_first_use=True,
         )
 
-        # Setup standard logging with PII filter
+        # Setup standard logging without PII filter to prevent recursion
         logging.basicConfig(
             level=logging.INFO if self.environment == "production" else logging.DEBUG,
-            format="%(message)s",
+            format="%(asctime)s - %(levelname)s - %(message)s",
         )
-
-        # Add PII filter to all handlers
-        pii_filter = SecureLoggingFilter(self.pii_detector)
-        for handler in logging.root.handlers:
-            handler.addFilter(pii_filter)
 
     def get_logger(self, name: str = None) -> structlog.stdlib.BoundLogger:
         """Get a structured logger instance"""
@@ -429,19 +498,16 @@ class StructuredLogger:
     def log_security_event(
         self, event_type: str, details: Dict[str, Any], severity: str = "INFO"
     ) -> None:
-        """Log security events with proper structure"""
+        """Log security events with proper structure (PII filtering temporarily disabled)"""
         logger = self.get_logger("security")
 
-        # Clean sensitive data from details
-        pii_filter = SecureLoggingFilter(self.pii_detector)
-        cleaned_details = pii_filter._clean_dict(details)
-
+        # Skip PII cleaning to prevent recursion
         log_data = {
             "event_type": event_type,
             "severity": severity,
             "environment": self.environment,
             "service": self.service_name,
-            "details": cleaned_details,
+            "details": details,  # No PII cleaning to prevent recursion
         }
 
         if severity.upper() == "ERROR":

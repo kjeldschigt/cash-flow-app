@@ -5,23 +5,37 @@ Provides comprehensive financial calculations including margins, ROI,
 trend analysis, and break-even calculations with currency support.
 """
 
+from __future__ import annotations
+
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union, Tuple, TypeVar, Generic, Type, cast
+
 import pandas as pd
 import numpy as np
 
+# Import from local modules with absolute imports
+from src.security.pii_protection import get_structured_logger
+from src.utils.currency_utils import CurrencyUtils
+from src.models import (
+    Cost, RecurringCost, CostCategory,
+    Payment, PaymentStatus, PaymentSchedule
+)
+
+# Type variables for generic methods
+T = TypeVar('T', bound='FinancialCalculator')
+
+# Configure logger
 try:
-    from ..security.pii_protection import get_structured_logger
-
     logger = get_structured_logger().get_logger(__name__)
-except ImportError:
-    import logging
-
+except Exception:
     logger = logging.getLogger(__name__)
-
-from ..utils.currency_utils import CurrencyUtils
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 
 class FinancialCalculator:

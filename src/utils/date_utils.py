@@ -61,32 +61,46 @@ class DateUtils:
         return date(year, month, day)
 
     @staticmethod
-    def get_next_recurrence_date(last_date: date, recurrence: str) -> date:
-        """Calculate next recurrence date based on recurrence type."""
+    def get_next_recurrence_date(last_date: date, recurrence_pattern: str) -> date:
+        """Calculate next recurrence date based on recurrence pattern.
+        
+        Args:
+            last_date: The last occurrence date
+            recurrence_pattern: The recurrence pattern (e.g., 'weekly', 'monthly')
+            
+        Returns:
+            date: The next occurrence date
+        """
         recurrence_map = {
             "weekly": timedelta(weeks=1),
             "bi-weekly": timedelta(weeks=2),
+            "biweekly": timedelta(weeks=2),  # Alternative spelling
             "monthly": None,  # Handle separately
+            "bimonthly": None,  # Handle separately
             "every 2 months": None,  # Handle separately
             "quarterly": None,  # Handle separately
             "semiannual": None,  # Handle separately
+            "annual": None,  # Handle separately
             "yearly": None,  # Handle separately
         }
 
-        if recurrence in recurrence_map and recurrence_map[recurrence]:
-            return last_date + recurrence_map[recurrence]
-        elif recurrence == "monthly":
+        # Normalize the recurrence pattern (lowercase and strip whitespace)
+        pattern = recurrence_pattern.lower().strip()
+        
+        if pattern in recurrence_map and recurrence_map[pattern]:
+            return last_date + recurrence_map[pattern]
+        elif pattern == "monthly":
             return DateUtils.add_months(last_date, 1)
-        elif recurrence == "every 2 months":
+        elif pattern in ("bimonthly", "every 2 months"):
             return DateUtils.add_months(last_date, 2)
-        elif recurrence == "quarterly":
+        elif pattern == "quarterly":
             return DateUtils.add_months(last_date, 3)
-        elif recurrence == "semiannual":
+        elif pattern == "semiannual":
             return DateUtils.add_months(last_date, 6)
-        elif recurrence == "yearly":
+        elif pattern in ("yearly", "annual"):
             return DateUtils.add_months(last_date, 12)
         else:
-            raise ValueError(f"Unknown recurrence type: {recurrence}")
+            raise ValueError(f"Unknown recurrence pattern: {recurrence_pattern}")
 
     @staticmethod
     def format_date_range(start_date: date, end_date: date) -> str:

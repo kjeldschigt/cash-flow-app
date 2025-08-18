@@ -152,7 +152,7 @@ class RedisSessionManager:
             session_data = SessionData(
                 user_id=user.id,
                 email=user.email,
-                role=user.role.value,
+                role=user.role,
                 created_at=now,
                 last_accessed=now,
                 csrf_token=csrf_token,

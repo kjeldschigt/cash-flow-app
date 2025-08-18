@@ -33,19 +33,24 @@ class UserRepository(BaseRepository[User]):
             ),
             is_active=bool(row.get("is_active", True)),
             username=row.get("username"),
+            full_name=row.get("full_name", row.get("username", "User")),
         )
 
     def _model_to_dict(self, model: User) -> dict:
         """Convert User model to dictionary."""
+        # Handle role conversion safely
+        role_value = model.role.value if hasattr(model.role, 'value') else str(model.role)
+        
         return {
             "id": model.id,
             "email": model.email,
             "password_hash": model.password_hash,
-            "role": model.role.value,
+            "role": role_value,
             "created_at": model.created_at.isoformat() if model.created_at else None,
             "last_login": model.last_login.isoformat() if model.last_login else None,
             "is_active": model.is_active,
             "username": model.username,
+            "full_name": getattr(model, 'full_name', model.username or 'User'),
         }
 
     def find_by_email(self, email: str) -> Optional[User]:

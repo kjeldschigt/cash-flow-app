@@ -262,27 +262,19 @@ def generate_due_costs():
                 ''', (cost_id, next_due_str, row['category'], row['amount_expected'], 
                       row.get('comment', ''), False, None))
                 
-                # Calculate next due date based on recurrence
-                recurrence = row.get('recurrence', '').lower()
-                if recurrence == 'weekly':
+                # Calculate next due date based on recurrence_pattern (with fallback to 'recurrence' for backward compatibility)
+                recurrence_pattern = row.get('recurrence_pattern', row.get('recurrence', '')).lower()
+                if recurrence_pattern == 'weekly':
                     new_due_date = next_due_date + timedelta(days=7)
-                elif recurrence == 'bi-weekly' or recurrence == 'biweekly':
+                elif recurrence_pattern == 'bi-weekly' or recurrence_pattern == 'biweekly':
                     new_due_date = next_due_date + timedelta(days=14)
-                elif recurrence == 'monthly':
+                elif recurrence_pattern == 'monthly':
                     # Add 1 month (approximate)
                     if next_due_date.month == 12:
                         new_due_date = next_due_date.replace(year=next_due_date.year + 1, month=1)
                     else:
                         new_due_date = next_due_date.replace(month=next_due_date.month + 1)
-                elif recurrence == 'every 2 months':
-                    # Add 2 months
-                    month = next_due_date.month + 2
-                    year = next_due_date.year
-                    if month > 12:
-                        month -= 12
-                        year += 1
-                    new_due_date = next_due_date.replace(year=year, month=month)
-                elif recurrence == 'quarterly':
+                elif recurrence_pattern == 'quarterly':
                     # Add 3 months
                     month = next_due_date.month + 3
                     year = next_due_date.year
@@ -290,7 +282,7 @@ def generate_due_costs():
                         month -= 12
                         year += 1
                     new_due_date = next_due_date.replace(year=year, month=month)
-                elif recurrence == 'semiannual':
+                elif recurrence_pattern == 'semiannual':
                     # Add 6 months
                     month = next_due_date.month + 6
                     year = next_due_date.year
@@ -298,7 +290,7 @@ def generate_due_costs():
                         month -= 12
                         year += 1
                     new_due_date = next_due_date.replace(year=year, month=month)
-                elif recurrence == 'annual' or recurrence == 'yearly':
+                elif recurrence_pattern == 'annual' or recurrence_pattern == 'yearly':
                     new_due_date = next_due_date.replace(year=next_due_date.year + 1)
                 else:
                     continue  # Unknown recurrence, skip

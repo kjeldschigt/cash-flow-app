@@ -75,40 +75,54 @@ class Container:
         db = self.get_db_connection()
         settings = self.get_settings()
 
-        self._singletons["user_service"] = UserService(db)
-        self._singletons["payment_service"] = PaymentService(db)
-        self._singletons["payment_schedule_service"] = PaymentScheduleService(db)
-        self._singletons["cost_service"] = CostService(db)
-        self._singletons["recurring_cost_service"] = RecurringCostService(db)
-        self._singletons["integration_service"] = IntegrationService(db, settings)
-        self._singletons["analytics_service"] = AnalyticsService(db)
+        self._services["user_service"] = lambda: UserService(db)
+        self._services["payment_service"] = lambda: PaymentService(db)
+        self._services["payment_schedule_service"] = lambda: PaymentScheduleService(db)
+        self._services["cost_service"] = lambda: CostService(db)
+        self._services["recurring_cost_service"] = lambda: RecurringCostService(db)
+        self._services["integration_service"] = lambda: IntegrationService(db, settings)
+        self._services["analytics_service"] = lambda: AnalyticsService(db)
 
     def get_user_service(self) -> UserService:
         """Get user service instance."""
+        if "user_service" not in self._singletons:
+            self._singletons["user_service"] = self._services["user_service"]()
         return self._singletons["user_service"]
 
     def get_payment_service(self) -> PaymentService:
         """Get payment service instance."""
+        if "payment_service" not in self._singletons:
+            self._singletons["payment_service"] = self._services["payment_service"]()
         return self._singletons["payment_service"]
 
     def get_payment_schedule_service(self) -> PaymentScheduleService:
         """Get payment schedule service instance."""
+        if "payment_schedule_service" not in self._singletons:
+            self._singletons["payment_schedule_service"] = self._services["payment_schedule_service"]()
         return self._singletons["payment_schedule_service"]
 
     def get_cost_service(self) -> CostService:
         """Get cost service instance."""
+        if "cost_service" not in self._singletons:
+            self._singletons["cost_service"] = self._services["cost_service"]()
         return self._singletons["cost_service"]
 
     def get_recurring_cost_service(self) -> RecurringCostService:
         """Get recurring cost service instance."""
+        if "recurring_cost_service" not in self._singletons:
+            self._singletons["recurring_cost_service"] = self._services["recurring_cost_service"]()
         return self._singletons["recurring_cost_service"]
 
     def get_integration_service(self) -> IntegrationService:
         """Get integration service instance."""
+        if "integration_service" not in self._singletons:
+            self._singletons["integration_service"] = self._services["integration_service"]()
         return self._singletons["integration_service"]
 
     def get_analytics_service(self) -> AnalyticsService:
         """Get analytics service instance."""
+        if "analytics_service" not in self._singletons:
+            self._singletons["analytics_service"] = self._services["analytics_service"]()
         return self._singletons["analytics_service"]
 
     def get_user_repository(self) -> UserRepository:

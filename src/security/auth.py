@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 from enum import Enum
 from ..models.user import User, UserRole
+from ..repositories.base import DatabaseConnection
 from ..services.user_service import UserService
 from ..config.settings import Settings
 
@@ -246,6 +247,79 @@ class AuthManager:
             return False
 
         return True
+
+
+def create_default_admin_user() -> Optional[str]:
+    """
+    Create a default admin user if no users exist in the system.
+    
+    Returns:
+        Optional[str]: The generated admin password if user was created, None otherwise
+    """
+    try:
+        from ..services.user_service import UserService
+        from ..models.user import User, UserRole
+        from ..config.settings import Settings
+        import secrets
+        import string
+        
+        # Generate a secure random password
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        password = ''.join(secrets.choice(alphabet) for _ in range(16))
+        
+        # Create admin user
+        settings = Settings()
+        db_connection = DatabaseConnection(settings.database.path)
+        user_service = UserService(db_connection)
+        
+        # Check if any users exist
+        if user_service.count() > 0:
+            return None
+            
+        # Create admin user
+        admin_user = User(
+            username="admin",
+            email="admin@cashflow.local",
+            full_name="Administrator",
+            role=UserRole.ADMIN,
+            is_active=True
+        )
+        
+        # Set password
+        user_service.create_user(admin_user, password)
+        
+        return password
+        
+    except Exception as e:
+        logger.error(f"Error creating default admin user: {str(e)}")
+        return None
+
+
+def init_auth_db(db_path: str = "cashflow.db") -> bool:
+    """
+    Initialize authentication database tables.
+    
+    Args:
+        db_path: Path to the SQLite database file
+        
+    Returns:
+        bool: True if initialization was successful, False otherwise
+    """
+    try:
+        # The DatabaseConnection class already handles table creation
+        # Just verify the connection works
+        db = DatabaseConnection(db_path)
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            # Verify users table exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            if not cursor.fetchone():
+                logger.error("Users table not found in database")
+                return False
+        return True
+    except Exception as e:
+        logger.error(f"Error initializing auth database: {str(e)}")
+        return False
 
 
 # Legacy compatibility function

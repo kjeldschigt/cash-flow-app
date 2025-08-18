@@ -126,7 +126,8 @@ class SessionMiddleware:
 
                 # Check role permissions
                 user_role = UserRole(session_data.role)
-                if user_role.value < min_role.value:
+                # Use level comparison instead of .value to avoid string/enum issues
+                if user_role.level < min_role.level:
                     st.error("❌ Insufficient permissions")
                     st.stop()
 
@@ -229,7 +230,7 @@ class SessionMiddleware:
             st.session_state["_authenticated"] = True
             st.session_state["_user_id"] = user.id
             st.session_state["_user_email"] = user.email
-            st.session_state["_user_role"] = user.role.value
+            st.session_state["_user_role"] = user.role
             st.session_state["_session_token"] = session_token
             st.session_state["_csrf_token"] = csrf_token
 
@@ -354,7 +355,7 @@ class SessionMiddleware:
                 return False
 
             user_role = UserRole(current_role)
-            return user_role.value >= required_role.value
+            return user_role.level >= required_role.level
 
         except Exception:
             return False

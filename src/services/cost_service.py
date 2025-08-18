@@ -125,7 +125,7 @@ class RecurringCostService:
         category: CostCategory,
         currency: str,
         amount_expected: Decimal,
-        recurrence: str,
+        recurrence_pattern: str,
         next_due_date: date,
         comment: Optional[str] = None,
     ) -> RecurringCost:
@@ -135,7 +135,7 @@ class RecurringCostService:
             category=category,
             currency=currency,
             amount_expected=amount_expected,
-            recurrence=recurrence,
+            recurrence_pattern=recurrence_pattern,
             next_due_date=next_due_date,
             comment=comment,
         )
@@ -181,7 +181,7 @@ class RecurringCostService:
 
             # Update next due date
             next_due = DateUtils.get_next_recurrence_date(
-                recurring_cost.next_due_date, recurring_cost.recurrence
+                recurring_cost.next_due_date, recurring_cost.recurrence_pattern
             )
             recurring_cost.update_next_due_date(next_due)
             self.recurring_cost_repository.save(recurring_cost)

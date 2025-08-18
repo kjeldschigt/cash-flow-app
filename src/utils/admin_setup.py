@@ -84,7 +84,7 @@ def setup_initial_admin() -> Optional[Tuple[str, str]]:
 
     # Generate secure credentials
     if not admin_email:
-        admin_email = "admin@localhost"
+        admin_email = "admin@cashflow.local"
 
     secure_password = generate_secure_password()
     success, message = create_admin_user(admin_email, secure_password)
@@ -129,7 +129,7 @@ def show_setup_wizard():
         st.subheader("Create Admin Account")
 
         admin_email = st.text_input(
-            "Admin Email", value="admin@localhost", help="This will be your login email"
+            "Admin Email", value="admin@cashflow.local", help="This will be your login email"
         )
 
         password_option = st.radio(

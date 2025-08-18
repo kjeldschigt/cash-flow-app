@@ -239,8 +239,8 @@ class FormComponents:
                     currency=currency,
                 )
 
-                recurrence = FormComponents.recurrence_select(
-                    value=initial.get("recurrence")
+                recurrence_pattern = FormComponents.recurrence_select(
+                    value=initial.get("recurrence_pattern", initial.get("recurrence"))
                 )
 
                 due_date = st.date_input(
@@ -254,7 +254,7 @@ class FormComponents:
             submitted = st.form_submit_button(submit_label, type="primary")
 
             if submitted:
-                if not name or not amount or not category or not recurrence:
+                if not name or not amount or not category or not recurrence_pattern:
                     st.error("Please fill in all required fields")
                     return None
 
@@ -263,7 +263,7 @@ class FormComponents:
                     "category": category,
                     "currency": currency,
                     "amount_expected": amount,
-                    "recurrence": recurrence,
+                    "recurrence_pattern": recurrence_pattern,
                     "due_date": due_date,
                     "comment": comment.strip() if comment else None,
                 }

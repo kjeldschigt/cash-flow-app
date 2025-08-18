@@ -77,7 +77,7 @@ class PaymentScheduleRepository(BaseRepository[PaymentSchedule]):
                 Decimal(str(row["amount_actual"])) if row["amount_actual"] else None
             ),
             comment=row["comment"],
-            recurrence=RecurrenceType(row["recurrence"]),
+            recurrence_pattern=RecurrenceType(row["recurrence"]),  # Alias will handle the mapping
             due_date=date.fromisoformat(row["due_date"]),
             status=PaymentStatus(row["status"]),
             created_at=(
@@ -104,7 +104,7 @@ class PaymentScheduleRepository(BaseRepository[PaymentSchedule]):
                 float(model.amount_actual) if model.amount_actual else None
             ),
             "comment": model.comment,
-            "recurrence": model.recurrence.value,
+            "recurrence": model.recurrence_pattern.value,  # Keep using alias for backward compatibility
             "due_date": model.due_date.isoformat(),
             "status": model.status.value,
             "created_at": model.created_at.isoformat() if model.created_at else None,

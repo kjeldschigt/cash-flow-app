@@ -2,10 +2,11 @@
 Analytics and metrics domain models.
 """
 
-from dataclasses import dataclass
-from datetime import date
+from dataclasses import dataclass, field
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, Dict, Any
+from enum import Enum, auto
+from typing import Optional, Dict, Any, List, Tuple
 
 
 @dataclass
@@ -73,6 +74,50 @@ class BusinessMetrics:
         if self.total_leads == 0:
             return Decimal("0")
         return (Decimal(self.sql_count) / Decimal(self.total_leads)) * 100
+
+
+class FinancialHealthRating(Enum):
+    """Enum for financial health ratings."""
+    EXCELLENT = auto()
+    GOOD = auto()
+    FAIR = auto()
+    POOR = auto()
+    CRITICAL = auto()
+
+
+@dataclass
+class FinancialHealthScore:
+    """Financial health score and analysis entity."""
+    
+    score: Decimal  # 0-100 scale
+    rating: FinancialHealthRating
+    date_calculated: datetime = field(default_factory=datetime.utcnow)
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    issues: List[str] = field(default_factory=list)
+    recommendations: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            'score': float(self.score),
+            'rating': self.rating.name,
+            'date_calculated': self.date_calculated.isoformat(),
+            'metrics': self.metrics,
+            'issues': self.issues,
+            'recommendations': self.recommendations
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'FinancialHealthScore':
+        """Create from dictionary."""
+        return cls(
+            score=Decimal(str(data['score'])),
+            rating=FinancialHealthRating[data['rating']],
+            date_calculated=datetime.fromisoformat(data['date_calculated']),
+            metrics=data.get('metrics', {}),
+            issues=data.get('issues', []),
+            recommendations=data.get('recommendations', [])
+        )
 
 
 @dataclass

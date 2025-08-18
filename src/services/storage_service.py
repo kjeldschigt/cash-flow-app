@@ -3,10 +3,26 @@ Storage service for data retrieval operations.
 """
 
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 import pandas as pd
 from ..repositories.base import DatabaseConnection
+
+# Global database connection instance
+_db_connection = None
+
+def get_db_connection() -> DatabaseConnection:
+    """
+    Create and return a database connection.
+    
+    Returns:
+        DatabaseConnection: A database connection instance.
+    """
+    global _db_connection
+    if _db_connection is None:
+        _db_connection = DatabaseConnection()
+    return _db_connection
 
 try:
     from ..security.pii_protection import get_structured_logger
@@ -21,14 +37,8 @@ except ImportError:
 # Legacy function imports for backward compatibility
 def init_db():
     """Initialize database - legacy function for compatibility."""
-    try:
-        from ..utils.db_init import initialize_database
-
-        return initialize_database()
-    except ImportError:
-        from utils.db_init import initialize_database
-
-        return initialize_database()
+    from ..utils.db_init import initialize_database
+    return initialize_database()
 
 
 def get_costs(
