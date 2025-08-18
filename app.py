@@ -214,36 +214,16 @@ def main_dashboard():
     except Exception as e:
         st.info("Navigate to specific pages using the sidebar to view detailed data and functionality.")
 
-# Initialize databases and create initial admin user
-try:
-    from src.models.user import UserRole
-    user_service = container.get_user_service()
-    
-    # Check if any users exist
-    users = user_service.get_all_active_users()
-    if not users:
-        # Create initial admin user
-        admin_user = user_service.register_user("admin@kalonsurf.com", "Kalon2025", UserRole.ADMIN)
-        if admin_user:
-            st.info("Initial admin user created: admin@kalonsurf.com")
-except Exception as e:
-    # Fallback to legacy auth system
-    from src.services.legacy_auth import init_auth_db, register_user
-    init_auth_db()
-    try:
-        import sqlite3
-        conn = sqlite3.connect('users.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM users")
-        user_count = cursor.fetchone()[0]
-        conn.close()
-        
-        if user_count == 0:
-            success, message = register_user("admin@kalonsurf.com", "Kalon2025")
-            if success:
-                st.info("Initial admin user created: admin@kalonsurf.com")
-    except Exception:
-        pass
+# Handle admin setup securely
+from src.utils.admin_setup import handle_admin_setup, show_setup_wizard
+
+# Check if admin setup is complete
+if not handle_admin_setup():
+    # Show setup wizard if no admin exists
+    if show_setup_wizard():
+        st.rerun()
+    else:
+        st.stop()  # Stop execution until admin is created
 
 # Check authentication using new auth components
 if not AuthComponents.is_authenticated():

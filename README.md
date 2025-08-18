@@ -72,7 +72,19 @@ A comprehensive financial management dashboard built with Streamlit for tracking
    python -c "from src.utils.db_init import initialize_database; initialize_database()"
    ```
 
-5. **Run the application**
+5. **Create admin user (Optional)**
+   ```bash
+   # Option 1: Use the command-line script
+   python scripts/create_admin.py
+   
+   # Option 2: Set environment variables in .env
+   ADMIN_EMAIL=admin@yourdomain.com
+   ADMIN_PASSWORD=your-secure-password
+   
+   # Option 3: Use the setup wizard on first launch (no action needed)
+   ```
+
+6. **Run the application**
    ```bash
    streamlit run app.py
    ```
