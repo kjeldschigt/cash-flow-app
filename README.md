@@ -35,6 +35,60 @@ A comprehensive financial management dashboard built with Streamlit for tracking
 - **📱 PWA Support**: Offline capabilities and mobile-responsive design
 - **🔍 Analytics**: Advanced reporting, data visualization, and business intelligence
 
+## 🚀 Quick Start
+
+### **Prerequisites**
+- Python 3.11 or higher
+- Git
+
+### **Installation**
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd cash-flow-app
+   ```
+
+2. **Set up environment**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+3. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   ```
+   
+   **⚠️ IMPORTANT**: Edit `.env` and add your actual API keys and secrets:
+   - **Stripe Keys**: Get from your Stripe Dashboard
+   - **Airtable Keys**: Get from your Airtable account settings
+   - **Encryption Key**: Generate a secure 32-character key
+   - **Database URL**: Set your database connection string
+
+4. **Initialize the database**
+   ```bash
+   python -c "from src.utils.db_init import initialize_database; initialize_database()"
+   ```
+
+5. **Run the application**
+   ```bash
+   streamlit run app.py
+   ```
+
+### **🔐 Security Setup**
+
+**Generate new API keys immediately:**
+- **Stripe**: Go to Stripe Dashboard → Developers → API Keys → Create new keys
+- **Airtable**: Go to Airtable → Account → Generate API Key
+- **Encryption Key**: Use `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+
+**Never commit sensitive data:**
+- All `.env` files are gitignored
+- Database files (`.db`) are excluded from version control
+- Use `.env.example` as a template only
+
 ## 🚀 Technology Stack
 
 ### **Frontend & Backend**
