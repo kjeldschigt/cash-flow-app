@@ -1,8 +1,224 @@
 import streamlit as st
 import pandas as pd
 import traceback
-from typing import Optional, Any, Union
+import logging
+import functools
+from typing import Optional, Any, Union, Dict, Callable
+from datetime import datetime
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Custom Exception Classes
+class DataValidationError(Exception):
+    """Raised when data validation fails"""
+    def __init__(self, message: str, field_name: str = None, value: Any = None):
+        self.field_name = field_name
+        self.value = value
+        super().__init__(message)
+
+class ExternalAPIError(Exception):
+    """Raised when external API calls fail"""
+    def __init__(self, message: str, service_name: str = None, status_code: int = None):
+        self.service_name = service_name
+        self.status_code = status_code
+        super().__init__(message)
+
+class CalculationError(Exception):
+    """Raised when financial calculations fail"""
+    def __init__(self, message: str, operation: str = None, values: Dict = None):
+        self.operation = operation
+        self.values = values
+        super().__init__(message)
+
+class InsufficientDataError(Exception):
+    """Raised when there's insufficient data for operations"""
+    def __init__(self, message: str, required_count: int = None, actual_count: int = None):
+        self.required_count = required_count
+        self.actual_count = actual_count
+        super().__init__(message)
+
+# User-friendly error message mapping
+ERROR_MESSAGES = {
+    'DataValidationError': {
+        'title': 'Data Validation Error',
+        'message': 'The provided data is invalid or incomplete.',
+        'suggestions': [
+            'Check that all required fields are filled',
+            'Verify data formats (dates, numbers, etc.)',
+            'Ensure data is within acceptable ranges'
+        ]
+    },
+    'ExternalAPIError': {
+        'title': 'External Service Error',
+        'message': 'Unable to connect to external service.',
+        'suggestions': [
+            'Check your internet connection',
+            'Verify API keys and credentials',
+            'Try again in a few minutes'
+        ]
+    },
+    'CalculationError': {
+        'title': 'Calculation Error',
+        'message': 'An error occurred during financial calculations.',
+        'suggestions': [
+            'Check input values for validity',
+            'Ensure no division by zero',
+            'Verify data completeness'
+        ]
+    },
+    'InsufficientDataError': {
+        'title': 'Insufficient Data',
+        'message': 'Not enough data available for this operation.',
+        'suggestions': [
+            'Add more data entries',
+            'Expand the date range',
+            'Check data filters'
+        ]
+    },
+    'ValueError': {
+        'title': 'Invalid Value',
+        'message': 'The provided value is not in the correct format.',
+        'suggestions': [
+            'Check number formats',
+            'Verify date formats',
+            'Ensure text fields are not empty'
+        ]
+    },
+    'KeyError': {
+        'title': 'Missing Data Field',
+        'message': 'Required data field is missing.',
+        'suggestions': [
+            'Check data source completeness',
+            'Verify column names',
+            'Update data import process'
+        ]
+    }
+}
+
+def get_user_friendly_message(exception: Exception) -> Dict[str, Any]:
+    """Convert technical exception to user-friendly message"""
+    exception_type = type(exception).__name__
+    
+    if exception_type in ERROR_MESSAGES:
+        error_info = ERROR_MESSAGES[exception_type].copy()
+        error_info['technical_details'] = str(exception)
+        return error_info
+    
+    # Default fallback
+    return {
+        'title': 'Unexpected Error',
+        'message': 'An unexpected error occurred.',
+        'suggestions': [
+            'Try refreshing the page',
+            'Check your data inputs',
+            'Contact support if the problem persists'
+        ],
+        'technical_details': str(exception)
+    }
+
+def global_error_handler(func: Callable) -> Callable:
+    """Global error handler decorator with logging and user-friendly messages"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (DataValidationError, ExternalAPIError, CalculationError, InsufficientDataError) as e:
+            # Log custom exceptions
+            logger.error(f"Custom exception in {func.__name__}: {e}", exc_info=True)
+            
+            # Show user-friendly error
+            error_info = get_user_friendly_message(e)
+            show_user_friendly_error(error_info, e)
+            
+            return None
+            
+        except Exception as e:
+            # Log unexpected exceptions
+            logger.error(f"Unexpected exception in {func.__name__}: {e}", exc_info=True)
+            
+            # Show user-friendly error
+            error_info = get_user_friendly_message(e)
+            show_user_friendly_error(error_info, e)
+            
+            return None
+    
+    return wrapper
+
+def show_user_friendly_error(error_info: Dict[str, Any], exception: Exception = None):
+    """Display user-friendly error message with recovery suggestions"""
+    st.error(f"**{error_info['title']}**")
+    st.write(error_info['message'])
+    
+    if error_info.get('suggestions'):
+        st.write("**Suggestions:**")
+        for suggestion in error_info['suggestions']:
+            st.write(f"• {suggestion}")
+    
+    # Show technical details in expander
+    if error_info.get('technical_details'):
+        with st.expander("Technical Details", expanded=False):
+            st.code(error_info['technical_details'])
+            
+            if exception and hasattr(exception, '__dict__'):
+                st.write("**Exception Attributes:**")
+                for key, value in exception.__dict__.items():
+                    st.write(f"• {key}: {value}")
+
+def error_recovery_strategy(operation_type: str, fallback_data: Any = None) -> Any:
+    """Implement error recovery strategies for common failures"""
+    recovery_strategies = {
+        'data_load': lambda: pd.DataFrame(),
+        'calculation': lambda: {'result': 0, 'error': True},
+        'api_call': lambda: {'data': [], 'success': False},
+        'file_operation': lambda: None,
+        'database_query': lambda: pd.DataFrame()
+    }
+    
+    strategy = recovery_strategies.get(operation_type)
+    if strategy:
+        logger.info(f"Applying recovery strategy for {operation_type}")
+        return strategy()
+    
+    return fallback_data
+
+def validate_and_handle_data(data: Any, validation_func: Callable, 
+                           error_message: str = "Data validation failed") -> bool:
+    """Validate data and handle errors with user-friendly messages"""
+    try:
+        if validation_func(data):
+            return True
+        else:
+            raise DataValidationError(error_message)
+    except DataValidationError:
+        raise
+    except Exception as e:
+        raise DataValidationError(f"{error_message}: {str(e)}")
+
+def safe_api_call(api_func: Callable, service_name: str, 
+                 fallback_data: Any = None, max_retries: int = 3) -> Any:
+    """Safely execute API calls with retries and error handling"""
+    for attempt in range(max_retries):
+        try:
+            result = api_func()
+            logger.info(f"Successful API call to {service_name}")
+            return result
+            
+        except Exception as e:
+            logger.warning(f"API call to {service_name} failed (attempt {attempt + 1}): {e}")
+            
+            if attempt == max_retries - 1:
+                # Final attempt failed
+                raise ExternalAPIError(
+                    f"Failed to connect to {service_name} after {max_retries} attempts",
+                    service_name=service_name
+                )
+            
+            # Wait before retry (exponential backoff)
+            import time
+            time.sleep(2 ** attempt)
+    
+    return fallback_data
 
 def show_error(msg: str, details: Optional[Union[str, Exception]] = None, show_traceback: bool = False):
     """

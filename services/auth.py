@@ -212,7 +212,7 @@ def reset_password(email: str, new_password: str) -> Tuple[bool, str]:
         logger.error(f"Password reset failed for {email}: {str(e)}")
         return False, f"Password reset failed: {str(e)}"
 
-def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+def get_user_info(user_id: str) -> Optional[Dict[str, Any]]:
     """Get user information by ID"""
     try:
         conn = get_db_connection()
@@ -221,7 +221,7 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         cursor.execute("""
             SELECT id, username, email, role, is_active, created_at, last_login
             FROM users 
-            WHERE id = ? AND is_active = TRUE
+            WHERE id = ?
         """, (user_id,))
         
         user = cursor.fetchone()
@@ -229,19 +229,51 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         
         if user:
             return {
-                "id": user[0],
-                "username": user[1],
-                "email": user[2],
-                "role": user[3],
-                "is_active": user[4],
-                "created_at": user[5],
-                "last_login": user[6]
+                'id': user[0],
+                'username': user[1],
+                'email': user[2],
+                'role': user[3],
+                'is_active': bool(user[4]),
+                'created_at': user[5],
+                'last_login': user[6]
             }
         
         return None
         
     except Exception as e:
-        logger.error(f"Error getting user by ID {user_id}: {str(e)}")
+        logger.error(f"Error getting user info: {str(e)}")
+        return None
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Get user information by email"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, username, email, role, is_active, created_at, last_login
+            FROM users 
+            WHERE email = ?
+        """, (email.lower().strip(),))
+        
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            return {
+                'id': user[0],
+                'username': user[1],
+                'email': user[2],
+                'role': user[3],
+                'is_active': bool(user[4]),
+                'created_at': user[5],
+                'last_login': user[6]
+            }
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error getting user by email: {str(e)}")
         return None
 
 def is_authenticated():

@@ -196,6 +196,10 @@ def run_migration(database_path: str = "cashflow.db") -> dict:
     
     return results
 
+def main():
+    """Main function for command line execution"""
+    run_migration()
+
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(
@@ -203,7 +207,7 @@ if __name__ == "__main__":
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
     
-    # Run migration
+    main()
     results = run_migration()
     
     if results['success']:

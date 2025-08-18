@@ -2,9 +2,13 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, Any
-from utils.error_handler import show_error, show_warning, validate_dataframe, ensure_dataframe_columns
+try:
+    from .error_handler import show_error, show_warning, validate_dataframe, ensure_dataframe_columns
+except ImportError:
+    # Fallback for when imported directly
+    from error_handler import show_error, show_warning, validate_dataframe, ensure_dataframe_columns
 
 # Database path
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cashflow.db')
