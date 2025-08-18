@@ -314,6 +314,109 @@ def generate_due_costs():
         if 'conn' in locals():
             conn.close()
 
+def calculate_metrics(costs_df: pd.DataFrame, sales_df: pd.DataFrame) -> Dict[str, Any]:
+    """Calculate financial metrics from costs and sales data"""
+    metrics = {
+        "total_costs": 0,
+        "total_sales": 0,
+        "net_profit": 0,
+        "profit_margin": 0,
+        "avg_daily_costs": 0,
+        "avg_daily_sales": 0
+    }
+    
+    try:
+        if not costs_df.empty and 'amount' in costs_df.columns:
+            metrics["total_costs"] = float(costs_df['amount'].sum())
+            if len(costs_df) > 0:
+                metrics["avg_daily_costs"] = metrics["total_costs"] / len(costs_df)
+        
+        if not sales_df.empty and 'amount' in sales_df.columns:
+            metrics["total_sales"] = float(sales_df['amount'].sum())
+            if len(sales_df) > 0:
+                metrics["avg_daily_sales"] = metrics["total_sales"] / len(sales_df)
+        
+        metrics["net_profit"] = metrics["total_sales"] - metrics["total_costs"]
+        
+        if metrics["total_sales"] > 0:
+            metrics["profit_margin"] = (metrics["net_profit"] / metrics["total_sales"]) * 100
+        
+    except Exception as e:
+        st.error(f"Error calculating metrics: {e}")
+    
+    return metrics
+
+def get_date_range_data(start_date: date, end_date: date) -> Dict[str, pd.DataFrame]:
+    """Fetch data within a specified date range and return DataFrames"""
+    try:
+        conn = sqlite3.connect('cashflow.db')
+        
+        # Convert dates to strings for SQL query
+        start_str = start_date.strftime('%Y-%m-%d')
+        end_str = end_date.strftime('%Y-%m-%d')
+        
+        # Fetch costs data within date range
+        costs_query = """
+        SELECT * FROM costs 
+        WHERE date BETWEEN ? AND ?
+        ORDER BY date DESC
+        """
+        costs_df = pd.read_sql_query(costs_query, conn, params=(start_str, end_str))
+        
+        # Fetch sales orders data within date range
+        sales_query = """
+        SELECT * FROM sales_orders 
+        WHERE date BETWEEN ? AND ?
+        ORDER BY date DESC
+        """
+        sales_df = pd.read_sql_query(sales_query, conn, params=(start_str, end_str))
+        
+        # Fetch cash out data within date range
+        cash_out_query = """
+        SELECT * FROM cash_out 
+        WHERE date BETWEEN ? AND ?
+        ORDER BY date DESC
+        """
+        cash_out_df = pd.read_sql_query(cash_out_query, conn, params=(start_str, end_str))
+        
+        # Fetch FX rates data within date range
+        fx_query = """
+        SELECT * FROM fx_rates 
+        WHERE date BETWEEN ? AND ?
+        ORDER BY date DESC
+        """
+        fx_df = pd.read_sql_query(fx_query, conn, params=(start_str, end_str))
+        
+        # Fetch loan payments data within date range
+        loan_query = """
+        SELECT * FROM loan_payments 
+        WHERE date BETWEEN ? AND ?
+        ORDER BY date DESC
+        """
+        loan_df = pd.read_sql_query(loan_query, conn, params=(start_str, end_str))
+        
+        conn.close()
+        
+        return {
+            'costs': costs_df,
+            'sales': sales_df,
+            'cash_out': cash_out_df,
+            'fx_rates': fx_df,
+            'loan_payments': loan_df
+        }
+        
+    except Exception as e:
+        st.error(f"Error fetching date range data: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return {
+            'costs': pd.DataFrame(),
+            'sales': pd.DataFrame(),
+            'cash_out': pd.DataFrame(),
+            'fx_rates': pd.DataFrame(),
+            'loan_payments': pd.DataFrame()
+        }
+
 def refresh_data():
     """Refresh all cached data"""
     clear_cache()

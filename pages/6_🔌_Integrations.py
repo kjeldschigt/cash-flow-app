@@ -8,15 +8,28 @@ from datetime import datetime
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.settings_manager import get_setting, update_setting, get_all_settings
-from services.auth import require_auth
+# Import new clean architecture components
+from src.container import get_container
+from src.ui.auth import AuthComponents
+from src.ui.components import UIComponents
+from src.ui.forms import FormComponents
+from src.models.integration import IntegrationType, IntegrationStatus
+from src.services.error_handler import get_error_handler
+
+# Legacy imports for theme
 from utils.theme_manager import apply_current_theme
 
-# Check authentication
-require_auth()
+# Check authentication using new auth system
+if not AuthComponents.require_authentication():
+    st.stop()
 
 # Apply theme
 apply_current_theme()
+
+# Get services from container
+container = get_container()
+integration_service = container.get_integration_service()
+error_handler = get_error_handler()
 
 st.title("🔌 Integrations")
 
@@ -28,248 +41,175 @@ if 'edit_integration' not in st.session_state:
 tab1, tab2, tab3 = st.tabs(["Manage Integrations", "Add Integration", "Test Webhook Payload"])
 
 with tab1:
-    st.subheader("Manage Integrations")
+    UIComponents.section_header("Manage Integrations", "Configure and monitor your external integrations")
     
-    # Get all integration settings from database
-    all_settings = get_all_settings()
-    integration_settings = {k: v for k, v in all_settings.items() if k.startswith('integration_')}
+    try:
+        # Get all integrations using service
+        integrations = integration_service.get_all_integrations()
+        
+        if not integrations:
+            UIComponents.empty_state(
+                "No Integrations Configured",
+                "Use the 'Add Integration' tab to set up your first integration."
+            )
+        else:
+            for integration in integrations:
+                with st.container():
+                    col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                    
+                    with col1:
+                        st.write(f"**{integration.name}**")
+                        st.write(f"Type: {integration.integration_type.value}")
+                    
+                    with col2:
+                        # Status display with badge
+                        if integration.status == IntegrationStatus.ACTIVE:
+                            UIComponents.status_badge("Active", "success")
+                        elif integration.status == IntegrationStatus.INACTIVE:
+                            UIComponents.status_badge("Inactive", "warning")
+                        else:
+                            UIComponents.status_badge("Error", "error")
+                    
+                    with col3:
+                        # Enable/Disable toggle
+                        if st.button(
+                            "Disable" if integration.status == IntegrationStatus.ACTIVE else "Enable",
+                            key=f"toggle_{integration.id}"
+                        ):
+                            try:
+                                if integration.status == IntegrationStatus.ACTIVE:
+                                    integration_service.disable_integration(integration.id)
+                                    UIComponents.success_message(f"Integration '{integration.name}' disabled")
+                                else:
+                                    integration_service.enable_integration(integration.id)
+                                    UIComponents.success_message(f"Integration '{integration.name}' enabled")
+                                st.rerun()
+                            except Exception as e:
+                                error_result = error_handler.handle_exception(e, "toggle_integration")
+                                UIComponents.error_message(error_result['message'])
+                    
+                    with col4:
+                        # Test button
+                        if st.button("Test", key=f"test_{integration.id}"):
+                            try:
+                                test_result = integration_service.test_integration(integration.id)
+                                if test_result:
+                                    UIComponents.success_message("Integration test successful!")
+                                else:
+                                    UIComponents.error_message("Integration test failed")
+                            except Exception as e:
+                                error_result = error_handler.handle_exception(e, "test_integration")
+                                UIComponents.error_message(error_result['message'])
+                    
+                    st.divider()
     
-    if not integration_settings:
-        st.info("No integrations configured yet. Use the 'Add Integration' tab to set up your first integration.")
-    else:
-        for setting_key, setting_value in integration_settings.items():
-            integration_name = setting_key.replace('integration_', '').replace('_', ' ').title()
-            
-            with st.container():
-                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-                
-                with col1:
-                    st.write(f"**{integration_name}**")
-                
-                with col2:
-                    # Status toggle
-                    enabled_key = f"{setting_key}_enabled"
-                    current_status = get_setting(enabled_key, True)
-                    status = st.toggle("Enabled", value=current_status, key=f"status_{setting_key}")
-                    if status != current_status:
-                        update_setting(enabled_key, status)
-                        st.rerun()
-                
-                with col3:
-                    # Last updated (mock for now)
-                    st.write("Last updated: Today")
-                
-                with col4:
-                    # Edit button
-                    if st.button("Edit", key=f"edit_{setting_key}"):
-                        st.session_state.edit_integration = setting_key
-                        st.rerun()
-                
-                # Show edit form if this integration is being edited
-                if st.session_state.edit_integration == setting_key:
-                    with st.form(f"edit_form_{setting_key}"):
-                        st.write(f"**Edit {integration_name}**")
-                        
-                        try:
-                            config = json.loads(setting_value) if isinstance(setting_value, str) else setting_value
-                        except:
-                            config = {}
-                        
-                        # Dynamic form fields based on integration type
-                        integration_type = config.get('type', 'webhook')
-                        
-                        new_name = st.text_input("Name", value=config.get('name', integration_name))
-                        
-                        if integration_type in ['stripe', 'airtable', 'google_ads']:
-                            new_api_key = st.text_input("API Key", value=config.get('api_key', ''), type="password")
-                        
-                        if integration_type == 'webhook':
-                            new_webhook_url = st.text_input("Webhook URL", value=config.get('webhook_url', ''))
-                        
-                        if integration_type == 'airtable':
-                            new_base_id = st.text_input("Base ID", value=config.get('base_id', ''))
-                            new_table_name = st.text_input("Table Name", value=config.get('table_name', ''))
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.form_submit_button("Save Changes"):
-                                updated_config = {
-                                    'type': integration_type,
-                                    'name': new_name,
-                                    'updated_at': datetime.now().isoformat()
-                                }
-                                
-                                if integration_type in ['stripe', 'airtable', 'google_ads']:
-                                    updated_config['api_key'] = new_api_key
-                                if integration_type == 'webhook':
-                                    updated_config['webhook_url'] = new_webhook_url
-                                if integration_type == 'airtable':
-                                    updated_config['base_id'] = new_base_id
-                                    updated_config['table_name'] = new_table_name
-                                
-                                update_setting(setting_key, json.dumps(updated_config))
-                                st.session_state.edit_integration = None
-                                st.success("Integration updated successfully!")
-                                st.rerun()
-                        
-                        with col2:
-                            if st.form_submit_button("Cancel"):
-                                st.session_state.edit_integration = None
-                                st.rerun()
-                
-                st.divider()
+    except Exception as e:
+        error_result = error_handler.handle_exception(e, "load_integrations")
+        UIComponents.error_message(error_result['message'])
 
 with tab2:
-    st.subheader("Add Integration")
+    UIComponents.section_header("Add Integration", "Set up new external integrations")
     
-    # Integration type selector
-    integration_type = st.selectbox(
-        "Integration Type",
-        ["Stripe", "AbleCDP", "Airtable", "Google Ads", "Webhook", "Custom"],
-        key="new_integration_type"
-    )
+    # Use new form component for integration setup
+    integration_form_data = FormComponents.integration_form()
     
-    with st.form("add_integration_form"):
-        st.write(f"**Configure {integration_type} Integration**")
-        
-        # Common fields
-        integration_name = st.text_input("Integration Name", placeholder=f"My {integration_type} Integration")
-        
-        # Type-specific fields
-        api_key = None
-        webhook_url = None
-        base_id = None
-        table_name = None
-        
-        if integration_type in ["Stripe", "AbleCDP", "Google Ads"]:
-            api_key = st.text_input("API Key", type="password", help="Enter your API key")
-        
-        if integration_type == "Webhook":
-            webhook_url = st.text_input("Webhook URL", placeholder="https://your-app.com/webhook")
-        
-        if integration_type == "Airtable":
-            api_key = st.text_input("API Key", type="password", help="Your Airtable API key")
-            base_id = st.text_input("Base ID", placeholder="appXXXXXXXXXXXXXX")
-            table_name = st.text_input("Table Name", placeholder="Leads")
-        
-        if integration_type == "Custom":
-            webhook_url = st.text_input("Endpoint URL", placeholder="https://api.example.com/endpoint")
-            api_key = st.text_input("API Key/Token", type="password", help="Authentication token")
-        
-        # Additional settings
-        with st.expander("Advanced Settings"):
-            events_to_subscribe = st.multiselect(
-                "Events to Subscribe",
-                ["payment.succeeded", "payment.failed", "lead.created", "lead.updated", "custom.event"],
-                default=["payment.succeeded"]
+    if integration_form_data:
+        try:
+            # Create integration using service
+            integration = integration_service.create_integration(
+                name=integration_form_data['name'],
+                integration_type=integration_form_data['type'],
+                config=integration_form_data['config']
             )
-        
-        if st.form_submit_button("Save Integration", type="primary"):
-            if not integration_name:
-                st.error("Please provide an integration name")
-            else:
-                # Create integration config
-                config = {
-                    'type': integration_type.lower().replace(' ', '_'),
-                    'name': integration_name,
-                    'events': events_to_subscribe,
-                    'created_at': datetime.now().isoformat(),
-                    'updated_at': datetime.now().isoformat()
-                }
-                
-                if api_key:
-                    config['api_key'] = api_key
-                if webhook_url:
-                    config['webhook_url'] = webhook_url
-                if base_id:
-                    config['base_id'] = base_id
-                if table_name:
-                    config['table_name'] = table_name
-                
-                # Save to settings
-                setting_key = f"integration_{integration_type.lower().replace(' ', '_')}_{integration_name.lower().replace(' ', '_')}"
-                update_setting(setting_key, json.dumps(config))
-                update_setting(f"{setting_key}_enabled", True)
-                
-                st.success(f"{integration_type} integration '{integration_name}' saved successfully!")
-                st.rerun()
+            
+            UIComponents.success_message(f"Integration '{integration.name}' created successfully!")
+            st.rerun()
+            
+        except Exception as e:
+            error_result = error_handler.handle_exception(e, "create_integration")
+            UIComponents.error_message(error_result['message'])
 
 with tab3:
-    st.subheader("Test Webhook Payload")
+    UIComponents.section_header("Test Webhook", "Send test payloads to webhook integrations")
     
-    # Get available webhook integrations
-    all_settings = get_all_settings()
-    webhook_integrations = {}
-    
-    for key, value in all_settings.items():
-        if key.startswith('integration_'):
-            try:
-                config = json.loads(value) if isinstance(value, str) else value
-                if 'webhook_url' in config:
-                    webhook_integrations[config['name']] = config['webhook_url']
-            except:
-                continue
-    
-    if not webhook_integrations:
-        st.info("No webhook integrations configured. Add a webhook integration first.")
-    else:
-        # Webhook selector
-        selected_webhook = st.selectbox(
-            "Select Webhook Integration",
-            list(webhook_integrations.keys())
-        )
+    try:
+        # Get webhook integrations using service
+        webhook_integrations = integration_service.get_integrations_by_type(IntegrationType.WEBHOOK)
         
-        webhook_url = webhook_integrations[selected_webhook]
-        st.write(f"**Target URL:** `{webhook_url}`")
-        
-        # Payload editor
-        default_payload = {
-            "event": "test.webhook",
-            "timestamp": datetime.now().isoformat(),
-            "data": {
-                "amount": 2500,
-                "currency": "usd",
-                "customer_id": "cust_123456"
-            }
-        }
-        
-        payload_text = st.text_area(
-            "Webhook Payload (JSON)",
-            value=json.dumps(default_payload, indent=2),
-            height=200,
-            help="Edit the JSON payload to test different webhook scenarios"
-        )
-        
-        col1, col2 = st.columns([1, 3])
-        
-        with col1:
-            if st.button("Send Test", type="primary"):
-                try:
-                    # Validate JSON
-                    payload = json.loads(payload_text)
-                    
-                    # Send POST request (mock for now since we don't have real endpoints)
-                    st.info(f"Sending test payload to {webhook_url}...")
-                    
-                    # Mock response (in real implementation, use requests.post)
-                    mock_response = {
-                        "status": "success",
-                        "message": "Webhook received successfully",
-                        "timestamp": datetime.now().isoformat()
+        if not webhook_integrations:
+            UIComponents.empty_state(
+                "No Webhook Integrations",
+                "Add a webhook integration first to test payloads."
+            )
+        else:
+            # Webhook selector
+            integration_names = [integration.name for integration in webhook_integrations]
+            selected_integration_name = st.selectbox(
+                "Select Webhook Integration",
+                integration_names
+            )
+            
+            selected_integration = next(
+                (integration for integration in webhook_integrations 
+                 if integration.name == selected_integration_name), 
+                None
+            )
+            
+            if selected_integration:
+                webhook_url = selected_integration.config.get('webhook_url', '')
+                st.write(f"**Target URL:** `{webhook_url}`")
+                
+                # Payload editor
+                default_payload = {
+                    "event": "test.webhook",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": {
+                        "amount": 2500,
+                        "currency": "usd",
+                        "customer_id": "cust_123456"
                     }
-                    
-                    st.success("✅ Webhook test successful!")
-                    st.json(mock_response)
-                    
-                except json.JSONDecodeError as e:
-                    st.error(f"Invalid JSON: {str(e)}")
-                except Exception as e:
-                    st.error(f"Error sending webhook: {str(e)}")
-        
-        with col2:
-            st.write("**Payload Preview:**")
-            try:
-                payload = json.loads(payload_text)
-                st.json(payload)
-            except:
-                st.error("Invalid JSON format")
+                }
+                
+                payload_text = st.text_area(
+                    "Webhook Payload (JSON)",
+                    value=json.dumps(default_payload, indent=2),
+                    height=200,
+                    help="Edit the JSON payload to test different webhook scenarios"
+                )
+                
+                col1, col2 = st.columns([1, 3])
+                
+                with col1:
+                    if st.button("Send Test", type="primary"):
+                        try:
+                            # Validate and send payload using service
+                            payload = json.loads(payload_text)
+                            
+                            result = integration_service.send_webhook_payload(
+                                selected_integration.id,
+                                payload
+                            )
+                            
+                            if result:
+                                UIComponents.success_message("✅ Webhook test successful!")
+                                st.json(result)
+                            else:
+                                UIComponents.error_message("Webhook test failed")
+                                
+                        except json.JSONDecodeError as e:
+                            UIComponents.error_message(f"Invalid JSON: {str(e)}")
+                        except Exception as e:
+                            error_result = error_handler.handle_exception(e, "send_webhook")
+                            UIComponents.error_message(error_result['message'])
+                
+                with col2:
+                    st.write("**Payload Preview:**")
+                    try:
+                        payload = json.loads(payload_text)
+                        st.json(payload)
+                    except:
+                        UIComponents.error_message("Invalid JSON format")
+    
+    except Exception as e:
+        error_result = error_handler.handle_exception(e, "load_webhook_integrations")
+        UIComponents.error_message(error_result['message'])

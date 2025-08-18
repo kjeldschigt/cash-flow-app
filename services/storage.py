@@ -61,19 +61,47 @@ def init_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS costs_monthly 
                    (month TEXT, category TEXT, amount REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
+    # Create payment_schedule table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS payment_schedule (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            category TEXT,
+            currency TEXT,
+            amount_expected REAL,
+            amount_actual REAL,
+            comment TEXT,
+            recurrence TEXT,
+            due_date DATE,
+            status TEXT DEFAULT 'scheduled'
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
 def load_table(table_name):
-    """Load data from specified table"""
-    conn = sqlite3.connect('cashflow.db')
-    try:
-        df = pd.read_sql(f'SELECT * FROM {table_name}', conn)
-        conn.close()
-        return df
-    except Exception as e:
-        conn.close()
-        return pd.DataFrame()
+    """Load a table as a pandas DataFrame."""
+    conn = get_db_connection()
+    df = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
+    conn.close()
+    return df
+
+def get_costs():
+    """Get all costs data"""
+    return load_table("costs")
+
+def get_sales_orders():
+    """Get all sales orders data"""
+    return load_table("sales_orders")
+
+def get_fx_rates():
+    """Get all FX rates data"""
+    return load_table("fx_rates")
+
+def get_loan_payments():
+    """Get all loan payments data"""
+    return load_table("loan_payments")
 
 def get_recurring_costs():
     """Return all recurring costs from the database."""
@@ -229,6 +257,47 @@ def load_settings():
         cur.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
         result = dict(cur.execute('SELECT * FROM settings').fetchall())
     return result
+
+def get_payment_schedule():
+    """Return all payment schedule entries from the database."""
+    return load_table("payment_schedule")
+
+def add_payment_schedule(row_dict):
+    """Insert a new payment schedule entry into the database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    columns = ', '.join(row_dict.keys())
+    placeholders = ', '.join(['?' for _ in row_dict])
+    values = list(row_dict.values())
+    
+    cursor.execute(f'''
+        INSERT INTO payment_schedule ({columns})
+        VALUES ({placeholders})
+    ''', values)
+    
+    conn.commit()
+    conn.close()
+
+def update_payment_schedule(id, **fields):
+    """Update specified fields for a payment schedule entry by ID."""
+    if not fields:
+        return
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    set_clause = ', '.join([f"{key} = ?" for key in fields.keys()])
+    values = list(fields.values()) + [id]
+    
+    cursor.execute(f'''
+        UPDATE payment_schedule 
+        SET {set_clause}
+        WHERE id = ?
+    ''', values)
+    
+    conn.commit()
+    conn.close()
 
 def get_combined_data():
     """Get combined sales and costs data"""

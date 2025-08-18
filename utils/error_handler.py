@@ -27,6 +27,29 @@ def show_error(msg: str, details: Optional[Union[str, Exception]] = None, show_t
                 st.write(str(details))
 
 
+def handle_error(func):
+    """
+    Decorator to handle errors in Streamlit functions gracefully.
+    
+    Args:
+        func: Function to wrap with error handling
+        
+    Returns:
+        Wrapped function with error handling
+    """
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            show_error(
+                f"An error occurred in {func.__name__}",
+                details=e,
+                show_traceback=True
+            )
+            return None
+    return wrapper
+
+
 def show_warning(msg: str, details: Optional[str] = None):
     """
     Display a warning message with optional details.
