@@ -57,7 +57,13 @@ class User:
             return False
         
         password_bytes = password.encode('utf-8')
-        return bcrypt.checkpw(password_bytes, self.password_hash)
+        # Handle both string and bytes stored hashes
+        if isinstance(self.password_hash, str):
+            hash_bytes = self.password_hash.encode('utf-8')
+        else:
+            hash_bytes = self.password_hash
+        
+        return bcrypt.checkpw(password_bytes, hash_bytes)
 
     def update_last_login(self) -> None:
         """Update the last login timestamp."""

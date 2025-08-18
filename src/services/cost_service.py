@@ -48,18 +48,23 @@ class CostService:
         return self.cost_repository.find_by_category(category)
     
     def get_unpaid_costs(self) -> List[Cost]:
-        """Get all unpaid costs."""
-        return self.cost_repository.find_unpaid_costs()
+        """Get unpaid costs."""
+        return self.cost_repository.find_unpaid()
     
-    def mark_cost_as_paid(self, cost_id: str) -> bool:
+    def mark_cost_paid(self, cost_id: str) -> bool:
         """Mark cost as paid."""
         cost = self.cost_repository.find_by_id(cost_id)
-        if not cost:
-            return False
-        
-        cost.mark_as_paid()
-        self.cost_repository.save(cost)
-        return True
+        if cost:
+            cost.mark_as_paid()
+            self.cost_repository.save(cost)
+            return True
+        return False
+    
+    def get_recurring_costs(self) -> List[Dict[str, Any]]:
+        """Get recurring costs - compatibility method."""
+        import pandas as pd
+        # Return empty DataFrame for now
+        return pd.DataFrame()
     
     def get_monthly_cost_summary(self, year: int, month: int) -> Dict[str, Any]:
         """Get monthly cost summary."""

@@ -17,7 +17,7 @@ from src.models.integration import IntegrationType, IntegrationStatus
 from src.services.error_handler import ErrorHandler
 
 # Legacy imports for theme
-from utils.theme_manager import apply_current_theme
+from src.utils.theme_manager import apply_current_theme
 
 # Check authentication using new auth system
 if not AuthComponents.require_authentication():
@@ -29,7 +29,7 @@ apply_current_theme()
 # Get services from container
 container = get_container()
 integration_service = container.get_integration_service()
-error_handler = get_error_handler()
+error_handler = container.get_error_handler()
 
 st.title("🔌 Integrations")
 

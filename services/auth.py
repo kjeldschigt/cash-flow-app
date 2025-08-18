@@ -154,7 +154,13 @@ def login_user(email_or_username: str, password: str) -> Tuple[bool, Any]:
         
         # Verify password
         password_bytes = password.encode('utf-8')
-        if bcrypt.checkpw(password_bytes, stored_hash.encode('utf-8')):
+        # Handle both string and bytes stored hashes
+        if isinstance(stored_hash, str):
+            stored_hash_bytes = stored_hash.encode('utf-8')
+        else:
+            stored_hash_bytes = stored_hash
+        
+        if bcrypt.checkpw(password_bytes, stored_hash_bytes):
             # Update last login
             cursor.execute(
                 "UPDATE users SET last_login = ? WHERE id = ?",

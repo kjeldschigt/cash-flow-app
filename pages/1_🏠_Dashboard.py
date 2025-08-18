@@ -20,6 +20,7 @@ from src.services.storage_service import StorageService
 from src.security.auth import AuthManager
 from src.utils.data_manager import calculate_metrics, get_date_range_data
 from src.services.error_handler import handle_error
+from src.utils.theme_manager import apply_theme
 from components.ui_helpers import render_metric_grid, create_section_header, render_chart_container
 
 # New clean architecture imports

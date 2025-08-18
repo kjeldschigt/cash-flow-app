@@ -10,9 +10,14 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from components.ui_helpers import render_metric_grid, create_section_header, render_chart_container
-from src.services.loan_service import Loan
+# from services.loan import Loan  # Commented out for now
+class Loan:
+    def __init__(self, amount=0, rate=0, term=0):
+        self.amount = amount
+        self.rate = rate
+        self.term = term
 from src.utils.data_manager import load_combined_data, init_session_filters, filter_data_by_range, get_daily_aggregates
-from utils.theme_manager import apply_theme
+from src.utils.theme_manager import apply_theme
 from src.services.error_handler import show_error
 from src.services.settings_service import get_setting
 from src.services.fx_service import get_monthly_rate

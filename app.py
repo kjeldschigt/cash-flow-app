@@ -64,7 +64,7 @@ try:
 
     # Legacy imports for backward compatibility
     try:
-        from utils.theme_manager import apply_theme, get_current_theme
+        from src.utils.theme_manager import apply_theme, get_current_theme
     except ImportError:
         # Fallback theme functions
         def apply_theme(theme=None):

@@ -185,19 +185,15 @@ class AuthManager:
     def _get_client_ip(self) -> str:
         """Get client IP address (simplified for Streamlit)"""
         # In production, you'd extract this from request headers
-        return "127.0.0.1"
+        return True
     
-    def logout_user(self) -> None:
-        """Securely logout user"""
+    def logout(self) -> None:
+        """Logout current user"""
         if 'user' in st.session_state:
-            user = st.session_state.user
-            logger.info(f"User logout: {user.email}")
-        
-        # Clear all session data
-        session_keys = ['user', 'login_time', 'last_activity', 'session_id', 'ip_address']
-        for key in session_keys:
-            st.session_state.pop(key, None)
-    
+            del st.session_state['user']
+        if 'authenticated' in st.session_state:
+            del st.session_state['authenticated']
+
     def get_current_user(self) -> Optional[User]:
         """Get current authenticated user"""
         if self.validate_session():
@@ -223,3 +219,14 @@ class AuthManager:
             return False
         
         return True
+
+
+# Legacy compatibility function
+def require_auth():
+    """Require authentication - legacy compatibility function."""
+    import streamlit as st
+    
+    if 'authenticated' not in st.session_state or not st.session_state.authenticated:
+        st.error("Please log in to access this page.")
+        st.stop()
+    return True

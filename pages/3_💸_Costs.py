@@ -20,7 +20,7 @@ from src.utils.business_rules import BusinessRuleValidator
 from src.utils.date_utils import DateUtils
 
 # Legacy imports for backward compatibility
-from utils.theme_manager import apply_theme
+from src.utils.theme_manager import apply_theme
 from src.services.settings_service import get_setting
 from src.services.error_handler import handle_error
 

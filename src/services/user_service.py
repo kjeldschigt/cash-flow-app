@@ -57,6 +57,10 @@ class UserService:
             logger.error(f"Error retrieving user by username {username}: {str(e)}")
             return None
     
+    def authenticate(self, identifier: str, password: str) -> Optional[User]:
+        """Authenticate user with email or username and password."""
+        return self.authenticate_with_identifier(identifier, password)
+    
     def authenticate_with_identifier(self, identifier: str, password: str) -> Optional[User]:
         """Authenticate user with email or username and password.
         

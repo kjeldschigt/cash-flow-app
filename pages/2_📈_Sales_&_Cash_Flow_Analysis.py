@@ -18,12 +18,12 @@ from src.security import AuditLogger, AuditAction
 from src.utils.date_utils import DateUtils
 
 # Legacy imports for backward compatibility
-from utils.theme_manager import apply_theme
+from src.utils.theme_manager import apply_theme
 from src.services.settings_service import get_setting
 from src.services.error_handler import handle_error
 
 # Legacy imports for theme
-from utils.theme_manager import apply_current_theme
+from src.utils.theme_manager import apply_current_theme
 
 # Check authentication using new auth system
 if not AuthComponents.require_authentication():

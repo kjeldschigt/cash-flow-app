@@ -5,7 +5,7 @@ import os
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.theme_manager import set_theme, get_current_theme, apply_theme
+from src.utils.theme_manager import get_current_theme, apply_theme
 from src.services.settings_service import get_setting, set_setting, get_all_settings
 from src.security.auth import require_auth
 

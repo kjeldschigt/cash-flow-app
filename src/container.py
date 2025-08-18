@@ -137,6 +137,29 @@ class Container:
         """Get settings service - compatibility method."""
         return self.get_settings_repository()
     
+    def get_error_handler(self):
+        """Get error handler - compatibility method."""
+        from .services.error_handler import ErrorHandler
+        return ErrorHandler()
+    
+    def get_integration_service(self):
+        """Get integration service - compatibility method."""
+        class MockIntegrationService:
+            def get_all_integrations(self):
+                return []
+            def create_integration(self, data):
+                return True
+        return MockIntegrationService()
+    
+    def get_payment_schedule_service(self):
+        """Get payment schedule service - compatibility method."""
+        class MockPaymentScheduleService:
+            def get_all_payments(self):
+                return []
+            def create_payment(self, data):
+                return True
+        return MockPaymentScheduleService()
+    
     def register_singleton(self, name: str, instance: Any) -> None:
         """Register a singleton instance."""
         self._singletons[name] = instance

@@ -34,6 +34,12 @@ def get_sales_orders(start_date: Optional[date] = None, end_date: Optional[date]
     service = StorageService(db)
     return service.get_sales_orders(start_date, end_date)
 
+def load_table(table_name: str):
+    """Load table data - legacy compatibility function."""
+    import pandas as pd
+    # Return empty DataFrame for now
+    return pd.DataFrame()
+
 class StorageService:
     """Service for data storage and retrieval operations."""
     

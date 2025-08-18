@@ -225,3 +225,78 @@ def get_error_handler() -> ErrorHandler:
     if _error_handler is None:
         _error_handler = ErrorHandler()
     return _error_handler
+
+
+def handle_error(exception: Exception, message: str = None, context: str = None):
+    """
+    Handle errors with logging and user feedback.
+    
+    Args:
+        exception: The exception that occurred
+        message: Custom error message
+        context: Context where error occurred
+    """
+    import streamlit as st
+    import uuid
+    import logging
+    
+    # Generate unique error ID
+    error_id = str(uuid.uuid4())[:8]
+    
+    # Log the error with full details
+    logger = logging.getLogger(__name__)
+    error_msg = f"Error {error_id}: {message or str(exception)}"
+    if context:
+        error_msg += f" (Context: {context})"
+    
+    logger.error(error_msg, exc_info=True)
+    
+    # Show user-friendly message in Streamlit
+    user_message = message or "An unexpected error occurred"
+    st.error(f"❌ {user_message} (Error ID: {error_id})")
+    
+    # In development, show more details
+    import os
+    if os.getenv('ENVIRONMENT', 'development') == 'development':
+        with st.expander("🔍 Error Details (Development Mode)"):
+            st.code(f"Exception: {type(exception).__name__}: {str(exception)}")
+            if context:
+                st.code(f"Context: {context}")
+            st.code(f"Error ID: {error_id}")
+    
+    return error_id
+
+
+def error_handler_decorator(custom_message: str = None, context: str = None):
+    """
+    Decorator to handle errors in functions.
+    
+    Args:
+        custom_message: Custom error message to display
+        context: Context information for debugging
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                handle_error(e, custom_message, context or func.__name__)
+                return None
+        return wrapper
+    return decorator
+
+
+def show_error(message: str, exception: Exception = None):
+    """
+    Show error message in Streamlit - compatibility function.
+    
+    Args:
+        message: Error message to display
+        exception: Optional exception object
+    """
+    import streamlit as st
+    
+    if exception:
+        handle_error(exception, message)
+    else:
+        st.error(f"❌ {message}")
