@@ -21,5 +21,5 @@ __all__ = [
     "CostRepository",
     "RecurringCostRepository",
     "IntegrationRepository",
-    "SettingsRepository"
+    "SettingsRepository",
 ]

@@ -11,6 +11,7 @@ from typing import Optional
 
 class PaymentStatus(Enum):
     """Payment status enumeration."""
+
     SCHEDULED = "scheduled"
     PAID = "paid"
     SKIPPED = "skipped"
@@ -20,6 +21,7 @@ class PaymentStatus(Enum):
 
 class RecurrenceType(Enum):
     """Payment recurrence types."""
+
     WEEKLY = "weekly"
     BIWEEKLY = "bi-weekly"
     MONTHLY = "monthly"
@@ -32,6 +34,7 @@ class RecurrenceType(Enum):
 @dataclass
 class Payment:
     """Individual payment entity."""
+
     id: Optional[str]
     amount: Decimal
     currency: str
@@ -50,15 +53,13 @@ class Payment:
 
     def is_overdue(self, due_date: date) -> bool:
         """Check if payment is overdue."""
-        return (
-            self.status == PaymentStatus.SCHEDULED 
-            and due_date < date.today()
-        )
+        return self.status == PaymentStatus.SCHEDULED and due_date < date.today()
 
 
 @dataclass
 class PaymentSchedule:
     """Payment schedule entity for recurring payments."""
+
     id: Optional[str]
     name: str
     category: str
@@ -81,8 +82,8 @@ class PaymentSchedule:
         amount_expected: Decimal,
         recurrence: RecurrenceType,
         due_date: date,
-        comment: Optional[str] = None
-    ) -> 'PaymentSchedule':
+        comment: Optional[str] = None,
+    ) -> "PaymentSchedule":
         """Create a new payment schedule."""
         return cls(
             id=None,
@@ -96,7 +97,7 @@ class PaymentSchedule:
             due_date=due_date,
             status=PaymentStatus.SCHEDULED,
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
     def mark_as_paid(self, actual_amount: Decimal) -> None:
@@ -112,7 +113,4 @@ class PaymentSchedule:
 
     def is_overdue(self) -> bool:
         """Check if scheduled payment is overdue."""
-        return (
-            self.status == PaymentStatus.SCHEDULED 
-            and self.due_date < date.today()
-        )
+        return self.status == PaymentStatus.SCHEDULED and self.due_date < date.today()

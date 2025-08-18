@@ -21,7 +21,9 @@ st.title("⚙️ Settings")
 
 # Create main navigation tabs
 if current_user.role == UserRole.ADMIN:
-    tab1, tab2, tab3 = st.tabs(["🎛️ Application Settings", "🔌 Service Integrations", "📊 System Info"])
+    tab1, tab2, tab3 = st.tabs(
+        ["🎛️ Application Settings", "🔌 Service Integrations", "📊 System Info"]
+    )
 else:
     tab1, tab3 = st.tabs(["🎛️ Application Settings", "📊 System Info"])
     tab2 = None
@@ -29,7 +31,10 @@ else:
 # Service Integrations Tab (Admin only)
 if tab2 and current_user.role == UserRole.ADMIN:
     with tab2:
-        from src.ui.enhanced_service_integrations import render_enhanced_service_integrations
+        from src.ui.enhanced_service_integrations import (
+            render_enhanced_service_integrations,
+        )
+
         render_enhanced_service_integrations()
 
 # Application Settings Tab
@@ -37,10 +42,16 @@ with tab1:
     # Theme toggle
     current_theme = get_current_theme()
     theme_options = {"Light": "light", "Dark": "dark"}
-    selected_theme = st.radio("Select Theme", options=list(theme_options.keys()), index=list(theme_options.keys()).index("Light" if current_theme == "light" else "Dark"))
+    selected_theme = st.radio(
+        "Select Theme",
+        options=list(theme_options.keys()),
+        index=list(theme_options.keys()).index(
+            "Light" if current_theme == "light" else "Dark"
+        ),
+    )
     if st.button("Apply Theme"):
         apply_theme(theme_options[selected_theme])
-    
+
     st.divider()
 
     # Load existing settings from database
@@ -53,142 +64,162 @@ with tab1:
     st.subheader("💸 Cost Defaults")
     with st.container():
         st.write("Set default values for cost calculations and FX rates")
-        
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
             # Cost-related defaults
             google_ads = st.number_input(
-                "Google Ads (Monthly)", 
-                value=float(saved_settings.get('google_ads', 5000.0)), 
-                min_value=0.0, 
+                "Google Ads (Monthly)",
+                value=float(saved_settings.get("google_ads", 5000.0)),
+                min_value=0.0,
                 step=100.0,
-                help="Default monthly Google Ads spend"
+                help="Default monthly Google Ads spend",
             )
-            if google_ads != saved_settings.get('google_ads', 5000.0):
-                set_setting('google_ads', google_ads)
-                
+            if google_ads != saved_settings.get("google_ads", 5000.0):
+                set_setting("google_ads", google_ads)
+
             huub_principal = st.number_input(
-                "Huub Principal Payment", 
-                value=float(saved_settings.get('huub_principal', 10000.0)), 
-                min_value=0.0, 
+                "Huub Principal Payment",
+                value=float(saved_settings.get("huub_principal", 10000.0)),
+                min_value=0.0,
                 step=500.0,
-                help="Default Huub principal payment"
+                help="Default Huub principal payment",
             )
-            if huub_principal != saved_settings.get('huub_principal', 10000.0):
-                set_setting('huub_principal', huub_principal)
-                
+            if huub_principal != saved_settings.get("huub_principal", 10000.0):
+                set_setting("huub_principal", huub_principal)
+
             huub_interest = st.number_input(
-                "Huub Interest Payment", 
-                value=float(saved_settings.get('huub_interest', 2000.0)), 
-                min_value=0.0, 
+                "Huub Interest Payment",
+                value=float(saved_settings.get("huub_interest", 2000.0)),
+                min_value=0.0,
                 step=100.0,
-                help="Default Huub interest payment"
+                help="Default Huub interest payment",
             )
-            if huub_interest != saved_settings.get('huub_interest', 2000.0):
-                set_setting('huub_interest', huub_interest)
-    
+            if huub_interest != saved_settings.get("huub_interest", 2000.0):
+                set_setting("huub_interest", huub_interest)
+
         with col2:
             # FX rates
             usd_cad_rate = st.number_input(
-                "USD/CAD Exchange Rate", 
-                value=float(saved_settings.get('usd_cad_rate', 1.35)), 
-                min_value=0.0, 
+                "USD/CAD Exchange Rate",
+                value=float(saved_settings.get("usd_cad_rate", 1.35)),
+                min_value=0.0,
                 step=0.01,
-                help="Default USD to CAD exchange rate"
+                help="Default USD to CAD exchange rate",
             )
-            if usd_cad_rate != saved_settings.get('usd_cad_rate', 1.35):
-                set_setting('usd_cad_rate', usd_cad_rate)
-                
+            if usd_cad_rate != saved_settings.get("usd_cad_rate", 1.35):
+                set_setting("usd_cad_rate", usd_cad_rate)
+
             occupancy = st.number_input(
-                "Default Occupancy %", 
-                value=float(saved_settings.get('occupancy', 75.0)), 
-                min_value=0.0, 
-                max_value=100.0, 
+                "Default Occupancy %",
+                value=float(saved_settings.get("occupancy", 75.0)),
+                min_value=0.0,
+                max_value=100.0,
                 step=0.1,
-                help="Default occupancy rate for calculations"
+                help="Default occupancy rate for calculations",
             )
-            if occupancy != saved_settings.get('occupancy', 75.0):
-                set_setting('occupancy', occupancy)
-                
+            if occupancy != saved_settings.get("occupancy", 75.0):
+                set_setting("occupancy", occupancy)
+
             total_leads = st.number_input(
-                "Default Total Leads", 
-                value=int(saved_settings.get('total_leads', 100)), 
-                min_value=0, 
+                "Default Total Leads",
+                value=int(saved_settings.get("total_leads", 100)),
+                min_value=0,
                 step=1,
-                help="Default total leads count"
+                help="Default total leads count",
             )
-            if total_leads != saved_settings.get('total_leads', 100):
-                set_setting('total_leads', total_leads)
+            if total_leads != saved_settings.get("total_leads", 100):
+                set_setting("total_leads", total_leads)
+
+            mql = st.number_input(
+                "Marketing Qualified Leads (MQL)",
+                value=int(saved_settings.get("mql", 50)),
+                min_value=0,
+                step=1,
+                help="Default MQL count",
+            )
+            if mql != saved_settings.get("mql", 50):
+                set_setting("mql", mql)
+
+            sql = st.number_input(
+                "Sales Qualified Leads (SQL)",
+                value=int(saved_settings.get("sql", 25)),
+                min_value=0,
+                step=1,
+                help="Default SQL count",
+            )
+            if sql != saved_settings.get("sql", 25):
+                set_setting("sql", sql)
 
     # Cost Levers Section
     st.subheader("💰 Cost Levers")
     with st.container():
         st.write("Configure cost parameters used in Costs and Scenarios analysis")
-        
+
         # Costa Rica Operations
         st.write("**🇨🇷 Costa Rica Operations:**")
         col1, col2 = st.columns(2)
         with col1:
             costa_usd = st.number_input(
-                "Costa Rica Cost (USD)", 
-                value=float(saved_settings.get('costa_usd', 19000.0)), 
-                min_value=0.0, 
+                "Costa Rica Cost (USD)",
+                value=float(saved_settings.get("costa_usd", 19000.0)),
+                min_value=0.0,
                 step=100.0,
-                help="Monthly operational costs in USD"
+                help="Monthly operational costs in USD",
             )
         with col2:
             costa_crc = st.number_input(
-                "Costa Rica Cost (CRC)", 
-            value=float(saved_settings.get('costa_crc', 38000000.0)), 
-            min_value=0.0, 
-            step=1000.0,
-            help="Monthly operational costs in Costa Rican Colones"
-        )
-    
+                "Costa Rica Cost (CRC)",
+                value=float(saved_settings.get("costa_crc", 38000000.0)),
+                min_value=0.0,
+                step=1000.0,
+                help="Monthly operational costs in Costa Rican Colones",
+            )
+
     # Hong Kong Operations
     st.write("**🇭🇰 Hong Kong Operations:**")
     hk_usd = st.number_input(
-        "Hong Kong Cost (USD)", 
-        value=float(saved_settings.get('hk_usd', 40000.0)), 
-        min_value=0.0, 
+        "Hong Kong Cost (USD)",
+        value=float(saved_settings.get("hk_usd", 40000.0)),
+        min_value=0.0,
         step=100.0,
-        help="Monthly operational costs in USD"
+        help="Monthly operational costs in USD",
     )
-    
+
     # Financial Settings
     st.write("**💳 Financial Settings:**")
     col1, col2 = st.columns(2)
     with col1:
         stripe_fee = st.number_input(
-            "Stripe Processing Fee %", 
-            value=float(saved_settings.get('stripe_fee', 4.2)), 
-            min_value=0.0, 
-            max_value=10.0, 
+            "Stripe Processing Fee %",
+            value=float(saved_settings.get("stripe_fee", 4.2)),
+            min_value=0.0,
+            max_value=10.0,
             step=0.1,
-            help="Payment processing fee percentage"
+            help="Payment processing fee percentage",
         )
         huub_principal = st.number_input(
-            "Huub Loan Principal", 
-            value=float(saved_settings.get('huub_principal', 1250000.0)), 
-            min_value=0.0, 
+            "Huub Loan Principal",
+            value=float(saved_settings.get("huub_principal", 1250000.0)),
+            min_value=0.0,
             step=1000.0,
-            help="Outstanding loan principal amount"
+            help="Outstanding loan principal amount",
         )
     with col2:
         huub_interest = st.number_input(
-            "Huub Loan Interest (Monthly)", 
-            value=float(saved_settings.get('huub_interest', 18750.0)), 
-            min_value=0.0, 
+            "Huub Loan Interest (Monthly)",
+            value=float(saved_settings.get("huub_interest", 18750.0)),
+            min_value=0.0,
             step=100.0,
-            help="Monthly interest payment"
+            help="Monthly interest payment",
         )
         google_ads = st.number_input(
-            "Google Ads Spend (USD)", 
-            value=float(saved_settings.get('google_ads', 27500.0)), 
-            min_value=0.0, 
+            "Google Ads Spend (USD)",
+            value=float(saved_settings.get("google_ads", 27500.0)),
+            min_value=0.0,
             step=100.0,
-            help="Monthly advertising spend"
+            help="Monthly advertising spend",
         )
 
 # Save cost configurations to session state
@@ -226,7 +257,9 @@ with col3:
 
 # Save Changes Section
 st.subheader("💾 Save Changes")
-st.write("Persist all settings to database and session state for use across the application")
+st.write(
+    "Persist all settings to database and session state for use across the application"
+)
 
 col1, col2, col3 = st.columns([1, 1, 2])
 
@@ -235,25 +268,27 @@ with col1:
         try:
             # Prepare settings data
             settings_data = {
-                'theme': st.session_state.get('theme', 'light'),
-                'occupancy': occupancy,
-                'total_leads': total_leads,
-                'mql': mql,
-                'sql': sql,
-                'costa_usd': costa_usd,
-                'costa_crc': costa_crc,
-                'hk_usd': hk_usd,
-                'stripe_fee': stripe_fee,
-                'huub_principal': huub_principal,
-                'huub_interest': huub_interest,
-                'google_ads': google_ads
+                "theme": st.session_state.get("theme", "light"),
+                "occupancy": occupancy,
+                "total_leads": total_leads,
+                "mql": mql,
+                "sql": sql,
+                "costa_usd": costa_usd,
+                "costa_crc": costa_crc,
+                "hk_usd": hk_usd,
+                "stripe_fee": stripe_fee,
+                "huub_principal": huub_principal,
+                "huub_interest": huub_interest,
+                "google_ads": google_ads,
             }
-            
+
             # Save to database
+            from src.services.settings_service import save_settings_to_db
+
             save_settings_to_db(settings_data)
             st.success("Settings saved successfully to database!")
             st.session_state.settings_saved = True
-            
+
         except Exception as e:
             st.error(f"Error saving settings: {str(e)}")
 
@@ -265,7 +300,7 @@ with col2:
         st.session_state.settings_reset = True
 
 with col3:
-    if st.session_state.get('settings_saved', False):
+    if st.session_state.get("settings_saved", False):
         st.success("✅ Settings are saved")
     else:
         st.info("💾 Changes not saved to database")
@@ -273,26 +308,32 @@ with col3:
 # Advanced Settings
 with st.expander("Advanced Settings"):
     st.write("**Database Configuration:**")
-    
+
     col1, col2 = st.columns(2)
     with col1:
         auto_save = st.checkbox("Auto-save changes", value=True)
         backup_enabled = st.checkbox("Enable daily backups", value=True)
-    
+
     with col2:
-        data_retention = st.number_input("Data retention (days)", value=365, min_value=30, max_value=2555)
-        cache_timeout = st.number_input("Cache timeout (minutes)", value=30, min_value=1, max_value=1440)
-    
+        data_retention = st.number_input(
+            "Data retention (days)", value=365, min_value=30, max_value=2555
+        )
+        cache_timeout = st.number_input(
+            "Cache timeout (minutes)", value=30, min_value=1, max_value=1440
+        )
+
     st.session_state.auto_save = auto_save
     st.session_state.backup_enabled = backup_enabled
     st.session_state.data_retention = data_retention
     st.session_state.cache_timeout = cache_timeout
-    
+
     st.write("**API Configuration:**")
-    
-    api_timeout = st.number_input("API timeout (seconds)", value=30, min_value=5, max_value=300)
+
+    api_timeout = st.number_input(
+        "API timeout (seconds)", value=30, min_value=5, max_value=300
+    )
     max_retries = st.number_input("Max API retries", value=3, min_value=1, max_value=10)
-    
+
     st.session_state.api_timeout = api_timeout
     st.session_state.max_retries = max_retries
 
@@ -304,40 +345,41 @@ col1, col2 = st.columns(2)
 with col1:
     if st.button("Export Settings", type="secondary"):
         import json
-        
+
         export_data = {
-            'theme': st.session_state.get('theme', 'light'),
-            'business_metrics': {
-                'occupancy': occupancy,
-                'total_leads': total_leads,
-                'mql': mql,
-                'sql': sql
+            "theme": st.session_state.get("theme", "light"),
+            "business_metrics": {
+                "occupancy": occupancy,
+                "total_leads": total_leads,
+                "mql": mql,
+                "sql": sql,
             },
-            'cost_config': {
-                'costa_usd': costa_usd,
-                'costa_crc': costa_crc,
-                'hk_usd': hk_usd,
-                'stripe_fee': stripe_fee,
-                'huub_principal': huub_principal,
-                'huub_interest': huub_interest,
-                'google_ads': google_ads
-            }
+            "cost_config": {
+                "costa_usd": costa_usd,
+                "costa_crc": costa_crc,
+                "hk_usd": hk_usd,
+                "stripe_fee": stripe_fee,
+                "huub_principal": huub_principal,
+                "huub_interest": huub_interest,
+                "google_ads": google_ads,
+            },
         }
-        
+
         st.download_button(
             label="Download settings.json",
             data=json.dumps(export_data, indent=2),
             file_name="cash_flow_settings.json",
-            mime="application/json"
+            mime="application/json",
         )
 
 with col2:
-    uploaded_file = st.file_uploader("Import Settings", type=['json'])
+    uploaded_file = st.file_uploader("Import Settings", type=["json"])
     if uploaded_file is not None:
         try:
             import json
+
             settings = json.load(uploaded_file)
-            
+
             if st.button("Apply Imported Settings"):
                 # Apply imported settings to session state
                 for key, value in settings.items():
@@ -346,31 +388,38 @@ with col2:
                             st.session_state[sub_key] = sub_value
                     else:
                         st.session_state[key] = value
-                
+
                 st.success("Settings imported successfully!")
                 st.session_state.settings_imported = True
-                
+
         except Exception as e:
             st.error(f"Error importing settings: {str(e)}")
 
 # System Info Tab
 with tab3:
     st.header("📊 System Information")
-    
+
     # Application info
     st.subheader("🏗️ Application")
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.metric("Application", "Cash Flow Dashboard")
         st.metric("Version", "2.1.0")
-        st.metric("Environment", "Production" if st.session_state.get('production', False) else "Development")
-    
+        st.metric(
+            "Environment",
+            (
+                "Production"
+                if st.session_state.get("production", False)
+                else "Development"
+            ),
+        )
+
     with col2:
         st.metric("User Role", current_user.role.name)
         st.metric("Session Active", "Yes" if current_user else "No")
         st.metric("Theme", current_theme.title())
-    
+
     # Security features
     if current_user and current_user.role == UserRole.ADMIN:
         st.subheader("🔐 Security Features")
@@ -382,27 +431,28 @@ with tab3:
             "✅ Audit logging",
             "✅ Secure memory management",
             "✅ CSRF protection",
-            "✅ Input validation and sanitization"
+            "✅ Input validation and sanitization",
         ]
-        
+
         for feature in security_features:
             st.markdown(feature)
-    
+
     # Database info
     st.subheader("🗄️ Database")
     try:
         from src.services.key_vault import get_key_vault_service
+
         vault_service = get_key_vault_service(
-            session_id=st.session_state.get('session_id', 'default'),
-            user_id=current_user.id if current_user else 0
+            session_id=st.session_state.get("session_id", "default"),
+            user_id=current_user.id if current_user else 0,
         )
         api_keys = vault_service.list_api_keys()
-        
+
         col1, col2 = st.columns(2)
         with col1:
             st.metric("Active API Keys", len([k for k in api_keys if k.is_active]))
             st.metric("Total Keys", len(api_keys))
-        
+
         with col2:
             services = set(k.service_type for k in api_keys if k.is_active)
             st.metric("Connected Services", len(services))
@@ -410,20 +460,22 @@ with tab3:
                 st.caption(f"Services: {', '.join(services)}")
     except Exception as e:
         st.error(f"Unable to load database info: {str(e)}")
-    
+
     # Cache statistics (Admin only)
     if current_user and current_user.role == UserRole.ADMIN:
         st.subheader("💾 Cache Statistics")
         try:
             cache_stats = vault_service.get_cache_stats()
-            
+
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Cached Keys", cache_stats["cached_keys"])
                 st.metric("Session ID", cache_stats["session_id"][:8] + "...")
-            
+
             with col2:
-                st.metric("Cache Timeout", f"{cache_stats['cache_timeout_minutes']:.0f} min")
+                st.metric(
+                    "Cache Timeout", f"{cache_stats['cache_timeout_minutes']:.0f} min"
+                )
                 if st.button("🧹 Clear Cache"):
                     vault_service.clear_cache()
                     st.success("Cache cleared successfully")

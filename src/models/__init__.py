@@ -13,7 +13,7 @@ from .analytics import CashFlowMetrics, BusinessMetrics
 
 __all__ = [
     "User",
-    "UserRole", 
+    "UserRole",
     "Payment",
     "PaymentStatus",
     "PaymentSchedule",
@@ -23,5 +23,5 @@ __all__ = [
     "Integration",
     "IntegrationType",
     "CashFlowMetrics",
-    "BusinessMetrics"
+    "BusinessMetrics",
 ]

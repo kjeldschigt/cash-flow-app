@@ -35,16 +35,16 @@ audit_logger = AuditLogger(container.get_db_connection())
 business_validator = BusinessRuleValidator()
 
 # Get current user for audit logging
-current_user = st.session_state.get('user', {}).get('email', 'unknown')
+current_user = st.session_state.get("user", {}).get("email", "unknown")
 
 # Apply theme and user info
-theme = get_setting('theme', 'light')
+theme = get_setting("theme", "light")
 st.markdown(apply_theme(theme), unsafe_allow_html=True)
 AuthComponents.user_info_sidebar()
 
 UIComponents.page_header(
     "💸 Costs Management",
-    "Manage your business costs and expenses with detailed tracking and analysis."
+    "Manage your business costs and expenses with detailed tracking and analysis.",
 )
 
 try:
@@ -54,58 +54,65 @@ try:
             # Get date range for filtering
             current_year = date.today().year
             year_start, year_end = DateUtils.get_year_range(current_year)
-            
+            today = date.today()
+            start_date = year_start
+
+            # Initialize filter variables
+            category_filter = "All"
+            currency_filter = "All"
+            date_range = f"{year_start} to {year_end}"
+
             # Load costs using service layer
             costs_df = cost_service.get_costs_by_date_range(year_start, year_end)
             recurring_costs_df = cost_service.get_recurring_costs()
-            
+
             # Log data access
             audit_logger.log_data_access(
                 user_id=current_user,
                 resource="costs_data",
-                filters={"year": current_year}
+                filters={"year": current_year},
             )
-            
+
         except Exception as e:
             handle_error(e, "Failed to load cost data")
             st.stop()
-    
+
     # Cost Entry Section
     UIComponents.section_header("Add New Cost", "Record one-time or recurring expenses")
-    
+
     # Use new form component for cost entry
     with st.expander("➕ Add New Cost", expanded=False):
         cost_form_data = FormComponents.cost_entry_form()
-        
+
         if cost_form_data:
             try:
                 # Validate business rules
                 validation_result = business_validator.validate_cost_entry(
-                    cost_form_data['amount'],
-                    cost_form_data['category'],
-                    cost_form_data.get('currency', 'USD')
+                    cost_form_data["amount"],
+                    cost_form_data["category"],
+                    cost_form_data.get("currency", "USD"),
                 )
-                
-                if not validation_result['valid']:
+
+                if not validation_result["valid"]:
                     st.error(f"Validation failed: {validation_result['message']}")
                 else:
                     # Create cost model
                     cost_model = CostModel(
-                        name=cost_form_data['name'],
-                        category=cost_form_data['category'],
-                        amount=cost_form_data['amount'],
-                        currency=cost_form_data.get('currency', 'USD'),
-                        date=cost_form_data['date'],
-                        description=cost_form_data.get('description', ''),
-                        is_recurring=cost_form_data.get('is_recurring', False)
+                        name=cost_form_data["name"],
+                        category=cost_form_data["category"],
+                        amount=cost_form_data["amount"],
+                        currency=cost_form_data.get("currency", "USD"),
+                        date=cost_form_data["date"],
+                        description=cost_form_data.get("description", ""),
+                        is_recurring=cost_form_data.get("is_recurring", False),
                     )
-                    
+
                     # Save using service
                     success = cost_service.create_cost(cost_model)
-                    
+
                     if success:
                         st.success("Cost added successfully!")
-                        
+
                         # Log the operation
                         audit_logger.log_financial_operation(
                             user_id=current_user,
@@ -115,172 +122,183 @@ try:
                             amount=cost_model.amount,
                             currency=cost_model.currency,
                             details={
-                                'category': cost_model.category,
-                                'name': cost_model.name
-                            }
+                                "category": cost_model.category,
+                                "name": cost_model.name,
+                            },
                         )
-                        
+
                         st.rerun()
                     else:
                         st.error("Failed to add cost. Please try again.")
-                        
+
             except Exception as e:
                 handle_error(e, "Failed to add cost")
-    
+
     st.divider()
-    
+
     # Cost Analytics Section
     UIComponents.section_header("Cost Analytics", "Overview of expenses and trends")
-    
+
     # Get cost analytics using service
     cost_analytics = analytics_service.get_cost_analytics(
         start_date=start_date,
         end_date=today,
         category=category_filter if category_filter != "All" else None,
-        currency=currency_filter if currency_filter != "All" else None
+        currency=currency_filter if currency_filter != "All" else None,
     )
-    
+
     if cost_analytics:
         col1, col2, col3, col4 = st.columns(4)
-        
+
         with col1:
             UIComponents.currency_metric(
-                "Total Costs",
-                cost_analytics.total_costs,
-                "USD"
+                "Total Costs", cost_analytics.total_costs, "USD"
             )
-        
+
         with col2:
             UIComponents.currency_metric(
-                "Average Daily",
-                cost_analytics.avg_daily_cost,
-                "USD"
+                "Average Daily", cost_analytics.avg_daily_cost, "USD"
             )
-        
+
         with col3:
             UIComponents.metric_card(
-                "Total Transactions",
-                str(cost_analytics.transaction_count),
-                "expenses"
+                "Total Transactions", str(cost_analytics.transaction_count), "expenses"
             )
-        
+
         with col4:
             UIComponents.currency_metric(
-                "Largest Expense",
-                cost_analytics.max_cost,
-                "USD"
+                "Largest Expense", cost_analytics.max_cost, "USD"
             )
-    
+
         st.divider()
-        
+
         # Cost Charts Section
-        UIComponents.section_header("Cost Analytics Charts", "Visual breakdown and trends")
-        
+        UIComponents.section_header(
+            "Cost Analytics Charts", "Visual breakdown and trends"
+        )
+
         # Get cost breakdown data
         cost_breakdown = cost_service.get_cost_breakdown(
             start_date=start_date,
             end_date=today,
-            category=category_filter if category_filter != "All" else None
+            category=category_filter if category_filter != "All" else None,
         )
-        
+
         if cost_breakdown:
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 UIComponents.section_header("📊 Costs by Category")
-                
+
                 try:
                     # Use analytics service for category analysis
-                    category_analysis = analytics_service.get_cost_breakdown_by_category(start_date, today)
-                    
+                    category_analysis = (
+                        analytics_service.get_cost_breakdown_by_category(
+                            start_date, today
+                        )
+                    )
+
                     if category_analysis:
                         fig_pie = UIComponents.create_pie_chart(
-                            values=[item['total_amount'] for item in category_analysis],
-                            labels=[item['category'] for item in category_analysis],
-                            title="Cost Distribution by Category"
+                            values=[item["total_amount"] for item in category_analysis],
+                            labels=[item["category"] for item in category_analysis],
+                            title="Cost Distribution by Category",
                         )
                         st.plotly_chart(fig_pie, use_container_width=True)
                     else:
                         # Fallback to basic grouping
-                        category_costs = cost_breakdown.groupby('category')['amount'].sum().sort_values(ascending=False)
+                        category_costs = (
+                            cost_breakdown.groupby("category")["amount"]
+                            .sum()
+                            .sort_values(ascending=False)
+                        )
                         fig_pie = UIComponents.create_pie_chart(
                             values=category_costs.values,
                             labels=category_costs.index,
-                            title="Cost Distribution by Category"
+                            title="Cost Distribution by Category",
                         )
                         st.plotly_chart(fig_pie, use_container_width=True)
-                        
+
                 except Exception as e:
                     handle_error(e, "Failed to create category chart")
-            
+
             with col2:
                 UIComponents.section_header("📈 Monthly Cost Trend")
-                
+
                 try:
                     # Use analytics service for trend analysis
-                    monthly_trends = analytics_service.get_monthly_cost_trends(start_date, today)
-                    
+                    monthly_trends = analytics_service.get_monthly_cost_trends(
+                        start_date, today
+                    )
+
                     if monthly_trends:
                         fig_line = UIComponents.create_line_chart(
-                            x_data=[trend['month'] for trend in monthly_trends],
-                            y_data=[trend['total_costs'] for trend in monthly_trends],
+                            x_data=[trend["month"] for trend in monthly_trends],
+                            y_data=[trend["total_costs"] for trend in monthly_trends],
                             title="Monthly Cost Trend",
                             x_label="Month",
-                            y_label="Cost (USD)"
+                            y_label="Cost (USD)",
                         )
                         st.plotly_chart(fig_line, use_container_width=True)
                     else:
                         # Fallback to basic trend calculation
-                        cost_breakdown['date'] = pd.to_datetime(cost_breakdown['date'])
-                        cost_breakdown['month'] = cost_breakdown['date'].dt.to_period('M')
-                        monthly_costs = cost_breakdown.groupby('month')['amount'].sum().reset_index()
-                        monthly_costs['month'] = monthly_costs['month'].astype(str)
-                        
+                        cost_breakdown["date"] = pd.to_datetime(cost_breakdown["date"])
+                        cost_breakdown["month"] = cost_breakdown["date"].dt.to_period(
+                            "M"
+                        )
+                        monthly_costs = (
+                            cost_breakdown.groupby("month")["amount"]
+                            .sum()
+                            .reset_index()
+                        )
+                        monthly_costs["month"] = monthly_costs["month"].astype(str)
+
                         fig_line = UIComponents.create_line_chart(
-                            x_data=monthly_costs['month'].tolist(),
-                            y_data=monthly_costs['amount'].tolist(),
+                            x_data=monthly_costs["month"].tolist(),
+                            y_data=monthly_costs["amount"].tolist(),
                             title="Monthly Cost Trend",
                             x_label="Month",
-                            y_label="Cost (USD)"
+                            y_label="Cost (USD)",
                         )
                         st.plotly_chart(fig_line, use_container_width=True)
-                        
+
                 except Exception as e:
                     handle_error(e, "Failed to create trend chart")
-        
+
         st.divider()
-        
+
         # Recent Costs Table
         UIComponents.section_header("Recent Costs", "Latest cost entries")
-        
+
         # Get recent costs using service
         recent_costs = cost_service.get_recent_costs(limit=10)
-        
+
         if recent_costs:
             # Convert to display format
             cost_data = []
             for cost in recent_costs:
-                cost_data.append({
-                    "Date": cost.date.strftime("%Y-%m-%d"),
-                    "Description": cost.description,
-                    "Category": cost.category,
-                    "Amount": f"{cost.currency} {cost.amount:,.2f}",
-                    "Notes": cost.notes or ""
-                })
-            
+                cost_data.append(
+                    {
+                        "Date": cost.date.strftime("%Y-%m-%d"),
+                        "Description": cost.description,
+                        "Category": cost.category,
+                        "Amount": f"{cost.currency} {cost.amount:,.2f}",
+                        "Notes": cost.notes or "",
+                    }
+                )
+
             UIComponents.data_table(cost_data, "Recent cost transactions")
         else:
             UIComponents.empty_state(
-                "No Recent Costs",
-                "No cost entries found for the selected period."
+                "No Recent Costs", "No cost entries found for the selected period."
             )
-    
+
     else:
         UIComponents.empty_state(
             "No Cost Data",
-            f"No cost data available for {date_range.lower()}. Add some costs to see analytics."
+            f"No cost data available for {date_range.lower()}. Add some costs to see analytics.",
         )
 
 except Exception as e:
-    error_result = error_handler.handle_exception(e, "cost_page_load")
-    UIComponents.error_message(error_result['message'])
+    error_result = handle_error(e, "cost_page_load")
+    UIComponents.error_message(error_result["message"])

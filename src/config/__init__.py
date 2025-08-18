@@ -10,8 +10,8 @@ from .environment import Environment
 
 __all__ = [
     "Settings",
-    "DatabaseConfig", 
+    "DatabaseConfig",
     "SecurityConfig",
     "IntegrationConfig",
-    "Environment"
+    "Environment",
 ]

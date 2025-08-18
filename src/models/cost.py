@@ -11,6 +11,7 @@ from typing import Optional
 
 class CostCategory(Enum):
     """Cost category enumeration."""
+
     MARKETING = "Marketing"
     OPERATIONS = "Operations"
     TECHNOLOGY = "Technology"
@@ -26,6 +27,7 @@ class CostCategory(Enum):
 @dataclass
 class Cost:
     """Individual cost entry entity."""
+
     id: Optional[str]
     date: date
     category: CostCategory
@@ -44,8 +46,8 @@ class Cost:
         amount_usd: Decimal,
         amount_crc: Optional[Decimal] = None,
         description: Optional[str] = None,
-        is_paid: bool = False
-    ) -> 'Cost':
+        is_paid: bool = False,
+    ) -> "Cost":
         """Create a new cost entry."""
         return cls(
             id=None,
@@ -56,7 +58,7 @@ class Cost:
             description=description,
             is_paid=is_paid,
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
     def mark_as_paid(self) -> None:
@@ -64,7 +66,9 @@ class Cost:
         self.is_paid = True
         self.updated_at = datetime.now()
 
-    def update_amount(self, amount_usd: Decimal, amount_crc: Optional[Decimal] = None) -> None:
+    def update_amount(
+        self, amount_usd: Decimal, amount_crc: Optional[Decimal] = None
+    ) -> None:
         """Update cost amounts."""
         self.amount_usd = amount_usd
         self.amount_crc = amount_crc
@@ -74,6 +78,7 @@ class Cost:
 @dataclass
 class RecurringCost:
     """Recurring cost template entity."""
+
     id: Optional[str]
     name: str
     category: CostCategory
@@ -95,8 +100,8 @@ class RecurringCost:
         amount_expected: Decimal,
         recurrence: str,
         next_due_date: date,
-        comment: Optional[str] = None
-    ) -> 'RecurringCost':
+        comment: Optional[str] = None,
+    ) -> "RecurringCost":
         """Create a new recurring cost."""
         return cls(
             id=None,
@@ -109,7 +114,7 @@ class RecurringCost:
             next_due_date=next_due_date,
             is_active=True,
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
     def deactivate(self) -> None:

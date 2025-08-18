@@ -10,9 +10,4 @@ from .forms import FormComponents
 from .charts import ChartComponents
 from .auth import AuthComponents
 
-__all__ = [
-    "UIComponents",
-    "FormComponents", 
-    "ChartComponents",
-    "AuthComponents"
-]
+__all__ = ["UIComponents", "FormComponents", "ChartComponents", "AuthComponents"]

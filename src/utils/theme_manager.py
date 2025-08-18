@@ -9,39 +9,39 @@ import os
 
 class ThemeManager:
     """Manages application theming and styling."""
-    
+
     # Default theme configuration
     DEFAULT_THEMES = {
-        'light': {
-            'primary_color': '#1f77b4',
-            'background_color': '#ffffff',
-            'secondary_background_color': '#f0f2f6',
-            'text_color': '#262730',
-            'font': 'sans serif'
+        "light": {
+            "primary_color": "#1f77b4",
+            "background_color": "#ffffff",
+            "secondary_background_color": "#f0f2f6",
+            "text_color": "#262730",
+            "font": "sans serif",
         },
-        'dark': {
-            'primary_color': '#ff6b6b',
-            'background_color': '#0e1117',
-            'secondary_background_color': '#262730',
-            'text_color': '#fafafa',
-            'font': 'sans serif'
+        "dark": {
+            "primary_color": "#ff6b6b",
+            "background_color": "#0e1117",
+            "secondary_background_color": "#262730",
+            "text_color": "#fafafa",
+            "font": "sans serif",
         },
-        'corporate': {
-            'primary_color': '#2e86de',
-            'background_color': '#ffffff',
-            'secondary_background_color': '#f8f9fa',
-            'text_color': '#2c3e50',
-            'font': 'sans serif'
+        "corporate": {
+            "primary_color": "#2e86de",
+            "background_color": "#ffffff",
+            "secondary_background_color": "#f8f9fa",
+            "text_color": "#2c3e50",
+            "font": "sans serif",
         },
-        'financial': {
-            'primary_color': '#27ae60',
-            'background_color': '#ffffff',
-            'secondary_background_color': '#ecf0f1',
-            'text_color': '#2c3e50',
-            'font': 'monospace'
-        }
+        "financial": {
+            "primary_color": "#27ae60",
+            "background_color": "#ffffff",
+            "secondary_background_color": "#ecf0f1",
+            "text_color": "#2c3e50",
+            "font": "monospace",
+        },
     }
-    
+
     # Custom CSS styles
     CUSTOM_CSS = """
     <style>
@@ -183,54 +183,54 @@ class ThemeManager:
     }
     </style>
     """
-    
+
     def __init__(self):
         self.current_theme = self._get_current_theme()
-    
+
     def _get_current_theme(self) -> str:
         """Get current theme from session state or environment."""
         # Check session state first
-        if hasattr(st, 'session_state') and 'theme' in st.session_state:
+        if hasattr(st, "session_state") and "theme" in st.session_state:
             return st.session_state.theme
-        
+
         # Check environment variable
-        env_theme = os.getenv('STREAMLIT_THEME', 'light')
-        return env_theme if env_theme in self.DEFAULT_THEMES else 'light'
-    
+        env_theme = os.getenv("STREAMLIT_THEME", "light")
+        return env_theme if env_theme in self.DEFAULT_THEMES else "light"
+
     def apply_theme(self, theme_name: Optional[str] = None) -> None:
         """
         Apply theme to the Streamlit application.
-        
+
         Args:
             theme_name: Name of the theme to apply. If None, uses current theme.
         """
         if theme_name and theme_name in self.DEFAULT_THEMES:
             self.current_theme = theme_name
-            if hasattr(st, 'session_state'):
+            if hasattr(st, "session_state"):
                 st.session_state.theme = theme_name
-        
+
         theme_config = self.DEFAULT_THEMES[self.current_theme]
-        
+
         # Apply custom CSS with theme variables
         css_with_vars = self._inject_theme_variables(self.CUSTOM_CSS, theme_config)
         st.markdown(css_with_vars, unsafe_allow_html=True)
-        
+
         # Apply additional theme-specific styling
         self._apply_theme_specific_styles(self.current_theme)
-    
+
     def _inject_theme_variables(self, css: str, theme_config: Dict[str, str]) -> str:
         """Inject theme variables into CSS."""
         css_vars = ":root {\n"
         for key, value in theme_config.items():
-            css_var_name = key.replace('_', '-')
+            css_var_name = key.replace("_", "-")
             css_vars += f"  --{css_var_name}: {value};\n"
         css_vars += "}\n"
-        
+
         return f"<style>{css_vars}{css}</style>"
-    
+
     def _apply_theme_specific_styles(self, theme_name: str) -> None:
         """Apply theme-specific additional styles."""
-        if theme_name == 'dark':
+        if theme_name == "dark":
             dark_css = """
             <style>
             /* Dark theme specific styles */
@@ -254,8 +254,8 @@ class ThemeManager:
             </style>
             """
             st.markdown(dark_css, unsafe_allow_html=True)
-        
-        elif theme_name == 'financial':
+
+        elif theme_name == "financial":
             financial_css = """
             <style>
             /* Financial theme specific styles */
@@ -280,30 +280,30 @@ class ThemeManager:
             </style>
             """
             st.markdown(financial_css, unsafe_allow_html=True)
-    
+
     def get_theme_config(self, theme_name: Optional[str] = None) -> Dict[str, str]:
         """Get theme configuration."""
         theme = theme_name or self.current_theme
-        return self.DEFAULT_THEMES.get(theme, self.DEFAULT_THEMES['light'])
-    
+        return self.DEFAULT_THEMES.get(theme, self.DEFAULT_THEMES["light"])
+
     def get_available_themes(self) -> list[str]:
         """Get list of available themes."""
         return list(self.DEFAULT_THEMES.keys())
-    
+
     def set_page_config(self, **kwargs) -> None:
         """Set page config with theme-appropriate defaults."""
         theme_config = self.get_theme_config()
-        
+
         default_config = {
-            'page_title': 'Cash Flow Dashboard',
-            'page_icon': '💰',
-            'layout': 'wide',
-            'initial_sidebar_state': 'expanded'
+            "page_title": "Cash Flow Dashboard",
+            "page_icon": "💰",
+            "layout": "wide",
+            "initial_sidebar_state": "expanded",
         }
-        
+
         # Merge with provided kwargs
         config = {**default_config, **kwargs}
-        
+
         try:
             st.set_page_config(**config)
         except st.errors.StreamlitAPIException:
@@ -326,7 +326,7 @@ def get_theme_manager() -> ThemeManager:
 def apply_theme(theme_name: Optional[str] = None) -> None:
     """
     Apply theme to the current Streamlit application.
-    
+
     Args:
         theme_name: Name of the theme to apply ('light', 'dark', 'corporate', 'financial').
                    If None, uses the current theme.
@@ -367,32 +367,32 @@ def set_theme_page_config(**kwargs) -> None:
 # Utility functions for theme-aware styling
 def get_success_color() -> str:
     """Get success color for current theme."""
-    return '#27ae60'
+    return "#27ae60"
 
 
 def get_error_color() -> str:
     """Get error color for current theme."""
-    return '#e74c3c'
+    return "#e74c3c"
 
 
 def get_warning_color() -> str:
     """Get warning color for current theme."""
-    return '#f39c12'
+    return "#f39c12"
 
 
 def get_info_color() -> str:
     """Get info color for current theme."""
-    return '#3498db'
+    return "#3498db"
 
 
-def create_status_badge(text: str, status: str = 'info') -> str:
+def create_status_badge(text: str, status: str = "info") -> str:
     """
     Create a styled status badge.
-    
+
     Args:
         text: Badge text
         status: Badge status ('success', 'warning', 'error', 'info')
-    
+
     Returns:
         HTML string for the badge
     """

@@ -23,9 +23,4 @@ try:
 except ImportError:
     AirtableService = None
 
-__all__ = [
-    "AuthService",
-    "StorageService", 
-    "StripeService",
-    "AirtableService"
-]
+__all__ = ["AuthService", "StorageService", "StripeService", "AirtableService"]
