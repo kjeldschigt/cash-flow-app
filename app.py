@@ -5,8 +5,10 @@ import os
 import logging
 from datetime import datetime
 
-# Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add src directory to path for imports
+src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 # Import database initialization utilities
 from utils.db_init import initialize_database, check_encryption_key, get_database_info
@@ -34,7 +36,7 @@ try:
         st.stop()
     
     # Show admin credentials if created
-    if db_results['admin_password']:
+    if db_results.get('admin_password'):
         st.success("✅ Database initialized successfully!")
         st.info(f"""
         🔑 **Default Admin Credentials Created:**
@@ -61,14 +63,31 @@ try:
     from src.security import AuditLogger, AuditAction, DataEncryption, SecureStorage
 
     # Legacy imports for backward compatibility
-    from utils.theme_manager import apply_theme, get_current_theme
-    from services.settings_manager import get_setting
+    try:
+        from utils.theme_manager import apply_theme, get_current_theme
+    except ImportError:
+        # Fallback theme functions
+        def apply_theme(theme=None):
+            pass
+        def get_current_theme():
+            return "default"
+    
     from dotenv import load_dotenv
     load_dotenv()
 
     # Initialize clean architecture container
     settings = Settings()
     container = configure_container(settings)
+    
+    # Initialize settings service
+    settings_service = container.get_settings_service()
+    def get_setting(key, default=None):
+        try:
+            return settings_service.get_setting(key, default)
+        except TypeError:
+            # Fallback for repositories that don't accept default parameter
+            result = settings_service.get_setting(key)
+            return result if result is not None else default
     
     # Initialize security components
     audit_logger = AuditLogger(container.get_db_connection())
@@ -143,7 +162,7 @@ def main_dashboard():
     """)
     
     # Load data once at top level using data manager
-    from utils.data_manager import load_combined_data, init_session_filters
+    from src.utils.data_manager import load_combined_data, init_session_filters
     from components.ui_helpers import render_metric_grid
     
     # Initialize session filters
@@ -209,7 +228,7 @@ try:
             st.info("Initial admin user created: admin@kalonsurf.com")
 except Exception as e:
     # Fallback to legacy auth system
-    from services.auth import init_auth_db, register_user
+    from src.services.legacy_auth import init_auth_db, register_user
     init_auth_db()
     try:
         import sqlite3

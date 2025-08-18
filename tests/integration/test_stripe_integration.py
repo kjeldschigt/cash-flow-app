@@ -11,7 +11,7 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from services.stripe import StripeService
+from src.services.payment_service import StripeService
 from models.cost import Cost
 from models.user import User, UserRole
 

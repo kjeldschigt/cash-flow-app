@@ -235,25 +235,25 @@ def cached_data(ttl: int = 3600, key_prefix: str = ""):
 @st.cache_data(ttl=300)  # 5 minutes TTL
 def get_cached_costs(date_filter: str = None) -> pd.DataFrame:
     """Get costs with Streamlit caching"""
-    from services.storage import get_costs
+    from src.services.storage_service import get_costs
     return get_costs()
 
 @st.cache_data(ttl=300)
 def get_cached_sales_orders(date_filter: str = None) -> pd.DataFrame:
     """Get sales orders with Streamlit caching"""
-    from services.storage import get_sales_orders
+    from src.services.storage_service import get_sales_orders
     return get_sales_orders()
 
 @st.cache_data(ttl=600)  # 10 minutes TTL
 def get_cached_fx_rates() -> pd.DataFrame:
     """Get FX rates with Streamlit caching"""
-    from services.storage import get_fx_rates
+    from src.services.storage_service import get_fx_rates
     return get_fx_rates()
 
 @cached_data(ttl=1800, key_prefix="metrics_")  # 30 minutes TTL
 def calculate_cached_metrics(costs_df: pd.DataFrame, sales_df: pd.DataFrame) -> Dict[str, Any]:
     """Calculate financial metrics with caching"""
-    from utils.data_manager import calculate_metrics
+    from src.utils.data_manager import calculate_metrics
     return calculate_metrics(costs_df, sales_df)
 
 @cached_data(ttl=3600, key_prefix="reports_")  # 1 hour TTL

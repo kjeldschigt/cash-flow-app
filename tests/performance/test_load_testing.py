@@ -15,7 +15,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from services.storage import add_cost, get_costs, add_sales_order, get_sales_orders
+from src.services.storage_service import add_cost, get_costs, add_sales_order, get_sales_orders
 from services.validators import validate_amount, validate_date, validate_currency
 from models.cost import Cost
 

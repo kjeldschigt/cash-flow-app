@@ -14,7 +14,7 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from services.auth import register_user, login_user, hash_password
+from src.security.auth import register_user, login_user, hash_password
 from services.validators import validate_email, validate_amount
 from models.user import User, UserRole
 
@@ -238,7 +238,7 @@ class TestDataProtectionSecurity:
         # This would check log files, error messages, etc.
         # For now, verify email is stored securely
         
-        from services.storage import get_db_connection
+        from src.services.storage_service import get_db_connection
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT email FROM users WHERE email = ?", (email,))

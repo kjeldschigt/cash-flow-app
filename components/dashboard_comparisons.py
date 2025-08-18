@@ -136,7 +136,7 @@ def analyze_trend_with_ai(df, metric_column):
 def calculate_period_deltas(date_select, comparison_to, start_date=None, end_date=None):
     """Calculate performance deltas based on selected period with enhanced DB filtering"""
     try:
-        from services.storage import get_combined_data
+        from src.services.storage_service import get_combined_data
         
         # Load data from database
         df = get_combined_data()

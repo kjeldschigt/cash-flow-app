@@ -10,14 +10,14 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from components.ui_helpers import render_metric_grid, create_section_header, render_chart_container
-from services.loan import Loan
-from utils.data_manager import load_combined_data, init_session_filters, filter_data_by_range, get_daily_aggregates
+from src.services.loan_service import Loan
+from src.utils.data_manager import load_combined_data, init_session_filters, filter_data_by_range, get_daily_aggregates
 from utils.theme_manager import apply_theme
-from utils.error_handler import show_error
-from services.settings_manager import get_setting
-from services.fx import get_monthly_rate
-from services.storage import load_table
-from services.auth import require_auth
+from src.services.error_handler import show_error
+from src.services.settings_service import get_setting
+from src.services.fx_service import get_monthly_rate
+from src.services.storage_service import load_table
+from src.security.auth import require_auth
 
 # Check authentication
 require_auth()

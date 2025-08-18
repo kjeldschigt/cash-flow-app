@@ -2,10 +2,13 @@
 User service for authentication and user management.
 """
 
+import logging
 from typing import Optional
 from ..models.user import User, UserRole
 from ..repositories.user_repository import UserRepository
 from ..repositories.base import DatabaseConnection
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -39,8 +42,50 @@ class UserService:
         return self.user_repository.find_by_id(user_id)
     
     def get_user_by_email(self, email: str) -> Optional[User]:
-        """Get user by email."""
-        return self.user_repository.find_by_email(email)
+        """Get user by email with proper error handling."""
+        try:
+            return self.user_repository.find_by_email(email)
+        except Exception as e:
+            logger.error(f"Error retrieving user by email {email}: {str(e)}")
+            return None
+    
+    def get_user_by_username(self, username: str) -> Optional[User]:
+        """Get user by username with proper error handling."""
+        try:
+            return self.user_repository.find_by_username(username)
+        except Exception as e:
+            logger.error(f"Error retrieving user by username {username}: {str(e)}")
+            return None
+    
+    def authenticate_with_identifier(self, identifier: str, password: str) -> Optional[User]:
+        """Authenticate user with email or username and password.
+        
+        Args:
+            identifier: Email address or username
+            password: User password
+            
+        Returns:
+            User object if authentication successful, None otherwise
+        """
+        try:
+            # First try to authenticate with email
+            user = self.get_user_by_email(identifier)
+            
+            # If not found by email, try username
+            if not user:
+                user = self.get_user_by_username(identifier)
+            
+            # Verify password if user found
+            if user and user.verify_password(password):
+                user.update_last_login()
+                self.user_repository.update_last_login(user.id)
+                return user
+                
+            return None
+            
+        except Exception as e:
+            logger.error(f"Authentication error for identifier {identifier}: {str(e)}")
+            return None
     
     def get_all_active_users(self) -> list[User]:
         """Get all active users."""

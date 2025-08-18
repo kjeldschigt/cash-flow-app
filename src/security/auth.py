@@ -89,31 +89,31 @@ class AuthManager:
         self.settings = settings
         self.failed_attempts = {}  # Track failed login attempts
     
-    def authenticate_user(self, email: str, password: str) -> Optional[User]:
-        """Authenticate user with enhanced security"""
+    def authenticate_user(self, login_identifier: str, password: str) -> Optional[User]:
+        """Authenticate user with enhanced security using email or username"""
         try:
             # Check for account lockout
-            if self._is_account_locked(email):
-                logger.warning(f"Login attempt on locked account: {email}")
+            if self._is_account_locked(login_identifier):
+                logger.warning(f"Login attempt on locked account: {login_identifier}")
                 return None
             
-            # Attempt authentication
-            user = self.user_service.authenticate_user(email, password)
+            # Attempt authentication with email or username
+            user = self.user_service.authenticate_with_identifier(login_identifier, password)
             
             if user:
                 # Reset failed attempts on successful login
-                self.failed_attempts.pop(email, None)
+                self.failed_attempts.pop(login_identifier, None)
                 self._create_secure_session(user)
-                logger.info(f"Successful login: {email}")
+                logger.info(f"Successful login: {login_identifier}")
                 return user
             else:
                 # Track failed attempt
-                self._record_failed_attempt(email)
-                logger.warning(f"Failed login attempt: {email}")
+                self._record_failed_attempt(login_identifier)
+                logger.warning(f"Failed login attempt: {login_identifier}")
                 return None
                 
         except Exception as e:
-            logger.error(f"Authentication error for {email}: {str(e)}")
+            logger.error(f"Authentication error for {login_identifier}: {str(e)}")
             return None
     
     def _create_secure_session(self, user: User) -> None:

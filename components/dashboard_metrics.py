@@ -13,7 +13,7 @@ def get_setting(key, default_value):
         return st.session_state[key]
     
     try:
-        from services.storage import load_settings
+        from src.services.storage_service import load_settings
         db_settings = load_settings()
         if key in db_settings:
             value = db_settings[key]

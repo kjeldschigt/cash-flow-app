@@ -37,12 +37,12 @@ def get_current_theme():
 def set_theme(theme: str):
     """Set and persist the theme, triggering a re-render."""
     apply_theme(theme)
-    from services.settings_manager import update_setting
+    from src.services.settings_service import update_setting
     update_setting('theme', theme)  # Persist to DB
     st.rerun()  # Refresh the app
 
 def apply_current_theme():
     """Apply the current theme from settings"""
-    from services.settings_manager import get_setting
+    from src.services.settings_service import get_setting
     theme = get_setting('theme', 'light')
     apply_theme(theme)

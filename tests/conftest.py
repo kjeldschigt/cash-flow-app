@@ -13,12 +13,14 @@ from unittest.mock import Mock, patch
 import sys
 
 # Add src to Python path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+src_path = os.path.join(os.path.dirname(__file__), '..', 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 from config.settings import Settings, DatabaseConfig, SecurityConfig
 from models.cost import Cost
 from models.user import User, UserRole
-from services.storage import init_db, get_db_connection
+from src.services.storage_service import init_db, get_db_connection
 
 @pytest.fixture(scope="session")
 def test_settings():

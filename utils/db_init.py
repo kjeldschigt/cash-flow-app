@@ -16,8 +16,8 @@ project_root = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, project_root)
 
 from migrations.fix_users_table import run_migration
-from services.storage import init_db
-from services.auth import init_auth_db, create_default_admin_user
+from src.services.storage_service import init_db
+from src.security.auth import init_auth_db, create_default_admin_user
 
 logger = logging.getLogger(__name__)
 

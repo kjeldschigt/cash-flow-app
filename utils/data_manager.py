@@ -227,7 +227,7 @@ def get_daily_aggregates(df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_due_costs():
     """Generate due costs from recurring costs and insert into costs table."""
-    from services.storage import get_recurring_costs, get_db_connection
+    from src.services.storage_service import get_recurring_costs, get_db_connection
     from datetime import datetime, timedelta
     import uuid
     

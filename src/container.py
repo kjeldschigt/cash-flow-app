@@ -133,6 +133,10 @@ class Container:
         """Get settings repository instance."""
         return self._singletons['settings_repository']
     
+    def get_settings_service(self):
+        """Get settings service - compatibility method."""
+        return self.get_settings_repository()
+    
     def register_singleton(self, name: str, instance: Any) -> None:
         """Register a singleton instance."""
         self._singletons[name] = instance

@@ -21,8 +21,8 @@ from src.utils.date_utils import DateUtils
 
 # Legacy imports for backward compatibility
 from utils.theme_manager import apply_theme
-from services.settings_manager import get_setting
-from utils.error_handler import handle_error
+from src.services.settings_service import get_setting
+from src.services.error_handler import handle_error
 
 # Authentication check using new auth components
 AuthComponents.require_authentication()

@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import stripe
 from dotenv import load_dotenv
-from utils.error_handler import show_error, handle_api_error, ensure_dataframe_columns
+from src.services.error_handler import show_error, handle_api_error, ensure_dataframe_columns
 from datetime import datetime, timedelta
 import time
 

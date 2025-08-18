@@ -10,12 +10,12 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from components.ui_helpers import render_metric_grid, create_section_header, render_chart_container
-from utils.data_manager import load_combined_data, init_session_filters, filter_data_by_range, get_daily_aggregates
+from src.utils.data_manager import load_combined_data, init_session_filters, filter_data_by_range, get_daily_aggregates
 from utils.theme_manager import apply_theme
-from utils.error_handler import show_error
-from services.fx import get_rate_scenarios, get_monthly_rate
-from services.settings_manager import get_setting
-from services.auth import require_auth
+from src.services.error_handler import show_error
+from src.services.fx_service import get_rate_scenarios, get_monthly_rate
+from src.services.settings_service import get_setting
+from src.security.auth import require_auth
 
 # Check authentication
 require_auth()

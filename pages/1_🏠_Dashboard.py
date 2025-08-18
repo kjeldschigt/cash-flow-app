@@ -11,20 +11,22 @@ import os
 import warnings
 
 # Add the src directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+src_path = os.path.join(os.path.dirname(__file__), '..', 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 # Import services and utilities
-from services.storage import get_costs, get_sales_orders, get_fx_rates, get_loan_payments
-from services.auth import require_auth
-from utils.data_manager import calculate_metrics, get_date_range_data
-from utils.error_handler import handle_error
+from src.services.storage_service import StorageService
+from src.security.auth import AuthManager
+from src.utils.data_manager import calculate_metrics, get_date_range_data
+from src.services.error_handler import handle_error
 from components.ui_helpers import render_metric_grid, create_section_header, render_chart_container
 
 # New clean architecture imports
 from src.container import get_container
 from src.ui.auth import AuthComponents
 from src.ui.components import UIComponents
-from src.services.error_handler import get_error_handler
+from src.services.error_handler import ErrorHandler
 
 # Configure page
 st.set_page_config(page_title="Dashboard", page_icon="🏠", layout="wide")

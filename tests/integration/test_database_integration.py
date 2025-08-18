@@ -12,7 +12,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from services.storage import (
+from src.services.storage_service import (
     init_db, get_db_connection, add_cost, get_costs, update_cost, delete_cost,
     add_sales_order, get_sales_orders, get_payment_schedule, add_payment_schedule
 )

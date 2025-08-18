@@ -14,7 +14,7 @@ from src.ui.components import UIComponents
 from src.ui.forms import FormComponents
 from src.models.payment import RecurrenceType, PaymentStatus
 from src.models.cost import CostCategory
-from src.services.error_handler import get_error_handler
+from src.services.error_handler import ErrorHandler
 
 # Legacy imports for theme
 from utils.theme_manager import apply_current_theme

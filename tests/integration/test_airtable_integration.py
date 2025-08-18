@@ -11,7 +11,7 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from services.airtable import AirtableService
+from src.services.integration_service import AirtableService
 from models.cost import Cost
 
 @pytest.mark.integration

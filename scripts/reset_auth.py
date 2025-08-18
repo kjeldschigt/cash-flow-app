@@ -22,7 +22,7 @@ import argparse
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.auth import get_db_connection, register_user, reset_password
+from src.security.auth import get_db_connection, register_user, reset_password
 from utils.db_init import initialize_database
 
 # Configure logging

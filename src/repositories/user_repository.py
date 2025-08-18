@@ -27,7 +27,8 @@ class UserRepository(BaseRepository[User]):
             role=UserRole(row.get('role', 'user')),
             created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
             last_login=datetime.fromisoformat(row['last_login']) if row['last_login'] else None,
-            is_active=bool(row.get('is_active', True))
+            is_active=bool(row.get('is_active', True)),
+            username=row.get('username')
         )
     
     def _model_to_dict(self, model: User) -> dict:
@@ -39,19 +40,50 @@ class UserRepository(BaseRepository[User]):
             'role': model.role.value,
             'created_at': model.created_at.isoformat() if model.created_at else None,
             'last_login': model.last_login.isoformat() if model.last_login else None,
-            'is_active': model.is_active
+            'is_active': model.is_active,
+            'username': model.username
         }
     
     def find_by_email(self, email: str) -> Optional[User]:
         """Find user by email address."""
-        with self.db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM {self._table_name} WHERE email = ? AND is_active = 1",
-                (email.lower().strip(),)
-            )
-            row = cursor.fetchone()
-            return self._row_to_model(row) if row else None
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT * FROM {self._table_name} WHERE email = ? AND is_active = 1",
+                    (email.lower().strip(),)
+                )
+                row = cursor.fetchone()
+                return self._row_to_model(row) if row else None
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Database error finding user by email {email}: {str(e)}")
+            return None
+    
+    def find_by_username(self, username: str) -> Optional[User]:
+        """Find user by username.
+        
+        Args:
+            username: The username to search for
+            
+        Returns:
+            User object if found, None otherwise
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT * FROM {self._table_name} WHERE username = ? AND is_active = 1",
+                    (username.strip(),)
+                )
+                row = cursor.fetchone()
+                return self._row_to_model(row) if row else None
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Database error finding user by username {username}: {str(e)}")
+            return None
     
     def find_active_users(self) -> List[User]:
         """Find all active users."""
