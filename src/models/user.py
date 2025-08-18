@@ -10,11 +10,22 @@ import bcrypt
 
 
 class UserRole(str, Enum):
-    """User role enumeration"""
+    """User role enumeration with numeric hierarchy"""
     ADMIN = "admin"
     MANAGER = "manager"
     USER = "user"
     VIEWER = "viewer"
+    
+    @property
+    def level(self) -> int:
+        """Get numeric permission level for role hierarchy"""
+        hierarchy = {
+            UserRole.VIEWER: 0,
+            UserRole.USER: 1,
+            UserRole.MANAGER: 2,
+            UserRole.ADMIN: 3
+        }
+        return hierarchy.get(self, 0)
 
 
 @dataclass
@@ -70,10 +81,13 @@ class User:
         self.last_login = datetime.now()
 
     def has_permission(self, required_role: UserRole) -> bool:
-        """Check if user has required permission level."""
-        role_hierarchy = {
-            UserRole.VIEWER: 1,
-            UserRole.USER: 2,
-            UserRole.ADMIN: 3
-        }
-        return role_hierarchy.get(self.role, 0) >= role_hierarchy.get(required_role, 0)
+        """Check if user has required permission level using role hierarchy."""
+        return self.role.level >= required_role.level
+    
+    def can_access_role(self, target_role: UserRole) -> bool:
+        """Check if user can access features for a specific role."""
+        return self.has_permission(target_role)
+    
+    def get_permission_level(self) -> int:
+        """Get user's numeric permission level."""
+        return self.role.level

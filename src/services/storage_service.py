@@ -7,8 +7,12 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 import pandas as pd
 from ..repositories.base import DatabaseConnection
-
-logger = logging.getLogger(__name__)
+try:
+    from ..security.pii_protection import get_structured_logger
+    logger = get_structured_logger().get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 # Legacy function imports for backward compatibility
 def init_db():
@@ -60,7 +64,7 @@ class StorageService:
                 df = pd.read_sql_query(query, conn, params=params)
                 return df.to_dict('records')
         except Exception as e:
-            logger.error(f"Error retrieving costs: {str(e)}")
+            logger.error("Error retrieving costs", operation="get_costs", error_type=type(e).__name__)
             return []
     
     def get_sales_orders(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[Dict[str, Any]]:
@@ -77,7 +81,7 @@ class StorageService:
                 df = pd.read_sql_query(query, conn, params=params)
                 return df.to_dict('records')
         except Exception as e:
-            logger.error(f"Error retrieving sales orders: {str(e)}")
+            logger.error("Error retrieving sales orders", operation="get_sales_orders", error_type=type(e).__name__)
             return []
     
     def get_fx_rates(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[Dict[str, Any]]:
@@ -94,7 +98,7 @@ class StorageService:
                 df = pd.read_sql_query(query, conn, params=params)
                 return df.to_dict('records')
         except Exception as e:
-            logger.error(f"Error retrieving FX rates: {str(e)}")
+            logger.error("Error retrieving FX rates", operation="get_fx_rates", error_type=type(e).__name__)
             return []
     
     def get_loan_payments(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[Dict[str, Any]]:
@@ -111,5 +115,5 @@ class StorageService:
                 df = pd.read_sql_query(query, conn, params=params)
                 return df.to_dict('records')
         except Exception as e:
-            logger.error(f"Error retrieving loan payments: {str(e)}")
+            logger.error("Error retrieving loan payments", operation="get_loan_payments", error_type=type(e).__name__)
             return []

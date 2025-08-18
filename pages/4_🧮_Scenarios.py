@@ -15,10 +15,11 @@ from src.utils.theme_manager import apply_theme
 from src.services.error_handler import show_error
 from src.services.fx_service import get_rate_scenarios, get_monthly_rate
 from src.services.settings_service import get_setting
-from src.security.auth import require_auth
+from src.ui.auth import AuthComponents
 
-# Check authentication
-require_auth()
+# Check authentication using new auth system
+if not AuthComponents.require_authentication():
+    st.stop()
 
 # Apply theme
 theme = get_setting('theme', 'light')

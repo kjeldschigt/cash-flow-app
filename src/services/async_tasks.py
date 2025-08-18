@@ -12,9 +12,12 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from queue import Queue, Empty
-import time
-
-logger = logging.getLogger(__name__)
+try:
+    from ..security.pii_protection import get_structured_logger
+    logger = get_structured_logger().get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 # Task queue for background processing
 task_queue = Queue()
@@ -89,7 +92,7 @@ class AsyncTaskProcessor:
             self.task_stats["running"] -= 1
             self.task_stats["failed"] += 1
             
-            logger.error(f"Task {task_id} failed: {e}")
+            logger.error("Task failed", task_id=task_id, error_type=type(e).__name__, operation="execute_task")
             raise
     
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -137,7 +140,7 @@ async def async_api_call(url: str, method: str = "GET", data: Dict = None, heade
                         "headers": dict(response.headers)
                     }
         except Exception as e:
-            logger.error(f"Async API call failed: {e}")
+            logger.error("Async API call failed", error_type=type(e).__name__, operation="fetch_data_async")
             return {"status": 500, "error": str(e)}
 
 async def fetch_stripe_data_async(api_key: str, endpoint: str) -> Dict[str, Any]:
@@ -162,7 +165,7 @@ async def fetch_airtable_data_async(api_key: str, base_id: str, table_name: str)
 
 def generate_report_background(report_type: str, filters: Dict[str, Any]) -> Dict[str, Any]:
     """Generate report in background thread"""
-    logger.info(f"Starting background report generation: {report_type}")
+    logger.info("Starting background report generation", report_type=report_type, operation="generate_report_background")
     
     # Simulate report generation
     time.sleep(2)  # Simulate processing time
@@ -178,12 +181,12 @@ def generate_report_background(report_type: str, filters: Dict[str, Any]) -> Dic
         }
     }
     
-    logger.info(f"Background report generation completed: {report_type}")
+    logger.info("Background report generation completed", report_type=report_type, operation="generate_report_background")
     return report_data
 
 def sync_external_data_background(service: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """Sync external data in background"""
-    logger.info(f"Starting background data sync: {service}")
+    logger.info("Starting background data sync", service=service, operation="sync_external_data_background")
     
     # Simulate data sync
     time.sleep(3)  # Simulate sync time
@@ -197,7 +200,7 @@ def sync_external_data_background(service: str, config: Dict[str, Any]) -> Dict[
         "errors": 0
     }
     
-    logger.info(f"Background data sync completed: {service}")
+    logger.info("Background data sync completed", service=service, operation="sync_external_data_background")
     return sync_result
 
 def calculate_complex_analytics_background(data_params: Dict[str, Any]) -> Dict[str, Any]:

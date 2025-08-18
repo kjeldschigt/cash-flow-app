@@ -2,18 +2,24 @@
 Error handling service for comprehensive error management.
 """
 
-import traceback
-import sys
-from typing import Any, Dict, Optional, Type
+import logging
+import uuid
+import streamlit as st
+from typing import Optional, Any, Dict
 from datetime import datetime
-from .logging_service import get_logger
+from enum import Enum
+
+from ..security.pii_protection import get_structured_logger
+
+# Use structured logger with PII protection
+logger = get_structured_logger().get_logger(__name__)
 
 
 class ErrorHandler:
     """Centralized error handling service."""
     
     def __init__(self):
-        self.logger = get_logger()
+        self.logger = logger
     
     def handle_exception(
         self,
@@ -25,15 +31,15 @@ class ErrorHandler:
         """Handle exception with logging and user-friendly error message."""
         error_id = self._generate_error_id()
         
-        # Log the full exception details
+        # Log the exception with structured logging
         self.logger.error(
-            f"Exception in {context or 'unknown context'} [ID: {error_id}]",
-            exception=exception,
-            user_id=user_id,
+            "Exception occurred",
             error_id=error_id,
-            additional_data=additional_data
+            error_type=type(exception).__name__,
+            context=context or 'unknown context',
+            user_id=user_id,
+            operation="handle_exception"
         )
-        
         # Return user-friendly error response
         return {
             'success': False,
@@ -54,12 +60,13 @@ class ErrorHandler:
         error_id = self._generate_error_id()
         
         self.logger.warning(
-            f"Validation error in {context or 'unknown context'} [ID: {error_id}]: {field} = {value} - {message}",
+            "Validation error",
+            error_id=error_id,
             field=field,
-            value=str(value),
-            error_id=error_id
+            message=message,
+            context=context or 'unknown context',
+            operation="handle_validation_error"
         )
-        
         return {
             'success': False,
             'error_id': error_id,
@@ -73,19 +80,19 @@ class ErrorHandler:
         self,
         exception: Exception,
         operation: str,
-        table: Optional[str] = None,
-        query: Optional[str] = None
+        affected_table: Optional[str] = None,
+        query_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """Handle database-specific errors."""
         error_id = self._generate_error_id()
         
         self.logger.error(
-            f"Database error during {operation} [ID: {error_id}]",
-            exception=exception,
+            "Database error",
+            error_id=error_id,
+            error_type=type(exception).__name__,
             operation=operation,
-            table=table,
-            query=query,
-            error_id=error_id
+            affected_table=affected_table,
+            query_type=query_type
         )
         
         return {
@@ -108,12 +115,13 @@ class ErrorHandler:
         error_id = self._generate_error_id()
         
         self.logger.error(
-            f"API error with {service} at {endpoint} [ID: {error_id}]",
-            exception=exception,
+            "API error",
+            error_id=error_id,
+            error_type=type(exception).__name__,
             service=service,
             endpoint=endpoint,
             status_code=status_code,
-            error_id=error_id
+            operation="handle_api_error"
         )
         
         return {
@@ -135,9 +143,10 @@ class ErrorHandler:
         error_id = self._generate_error_id()
         
         self.logger.warning(
-            f"Authentication error [ID: {error_id}]: {message}",
-            user_identifier=user_identifier,
-            error_id=error_id
+            "Authentication error",
+            error_id=error_id,
+            message=message,
+            operation="handle_auth_error"
         )
         
         return {
@@ -159,13 +168,13 @@ class ErrorHandler:
         error_id = self._generate_error_id()
         
         self.logger.warning(
-            f"Authorization error [ID: {error_id}]: User {user_id} with role {current_role} "
-            f"attempted to access {resource or 'resource'} requiring {required_role}",
+            "Authorization error",
+            error_id=error_id,
             user_id=user_id,
-            required_role=required_role,
             current_role=current_role,
-            resource=resource,
-            error_id=error_id
+            required_role=required_role,
+            resource=resource or 'resource',
+            operation="handle_authorization_error"
         )
         
         return {
@@ -249,7 +258,14 @@ def handle_error(exception: Exception, message: str = None, context: str = None)
     if context:
         error_msg += f" (Context: {context})"
     
-    logger.error(error_msg, exc_info=True)
+    # Use structured logger for consistent PII protection
+    structured_logger = get_structured_logger().get_logger("error_handler")
+    structured_logger.error(
+        "Unhandled exception",
+        error_type=type(exception).__name__,
+        context=context,
+        operation="handle_error"
+    )
     
     # Show user-friendly message in Streamlit
     user_message = message or "An unexpected error occurred"

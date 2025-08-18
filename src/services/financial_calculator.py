@@ -6,12 +6,14 @@ Provides comprehensive financial calculations and metrics.
 import logging
 import numpy as np
 import pandas as pd
-from datetime import datetime, date
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, List, Optional, Tuple, Any
-from ..utils.currency_utils import CurrencyUtils
+try:
+    from ..security.pii_protection import get_structured_logger
+    logger = get_structured_logger().get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
+from ..utils.currency_utils import CurrencyUtils
 
 class FinancialCalculator:
     """Financial calculator with comprehensive business metrics."""
@@ -65,11 +67,11 @@ class FinancialCalculator:
                 for currency, rate in exchange_rates.items():
                     result[f'net_profit_{currency.lower()}'] = net_profit * rate
             
-            logger.info(f"Net profit calculated: {net_profit}")
+            logger.info("Net profit calculated", operation="calculate_net_profit", net_profit=float(net_profit))
             return result
             
         except Exception as e:
-            logger.error(f"Error calculating net profit: {str(e)}")
+            logger.error("Error calculating net profit", operation="calculate_net_profit", error_type=type(e).__name__)
             raise
     
     def calculate_margin(self, revenue: Decimal, costs: Decimal) -> Dict[str, Any]:
@@ -120,7 +122,7 @@ class FinancialCalculator:
             }
             
         except Exception as e:
-            logger.error(f"Error calculating margin: {str(e)}")
+            logger.error("Error calculating margin", operation="calculate_margin", error_type=type(e).__name__)
             raise
     
     def calculate_roi(
@@ -184,7 +186,7 @@ class FinancialCalculator:
             }
             
         except Exception as e:
-            logger.error(f"Error calculating ROI: {str(e)}")
+            logger.error("Error calculating ROI", operation="calculate_roi", error_type=type(e).__name__)
             raise
     
     def calculate_cashflow_forecast(
@@ -259,7 +261,7 @@ class FinancialCalculator:
             }
             
         except Exception as e:
-            logger.error(f"Error calculating cash flow forecast: {str(e)}")
+            logger.error("Error calculating cash flow forecast", operation="calculate_cashflow_forecast", error_type=type(e).__name__)
             raise
     
     def _linear_forecast(self, data: np.ndarray, periods: int) -> np.ndarray:
@@ -329,5 +331,5 @@ class FinancialCalculator:
             }
             
         except Exception as e:
-            logger.error(f"Error calculating break-even point: {str(e)}")
+            logger.error("Error calculating break-even point", operation="calculate_break_even", error_type=type(e).__name__)
             raise

@@ -27,7 +27,7 @@ class Permission(str, Enum):
 class RoleBasedAccessControl:
     """Role-Based Access Control system"""
     
-    # Define role permissions
+    # Define role permissions with complete hierarchy
     ROLE_PERMISSIONS = {
         UserRole.ADMIN: {
             Permission.VIEW_DASHBOARD,
@@ -45,6 +45,11 @@ class RoleBasedAccessControl:
             Permission.MANAGE_COSTS,
             Permission.MANAGE_PAYMENTS,
             Permission.EXPORT_DATA
+        },
+        UserRole.USER: {
+            Permission.VIEW_DASHBOARD,
+            Permission.VIEW_ANALYTICS,
+            Permission.MANAGE_COSTS
         },
         UserRole.VIEWER: {
             Permission.VIEW_DASHBOARD,
@@ -208,14 +213,27 @@ class AuthManager:
         return True
     
     def require_role(self, required_role: UserRole) -> bool:
-        """Require specific user role"""
+        """Require minimum user role using hierarchy"""
         user = self.get_current_user()
         if not user:
             st.error("Authentication required")
             return False
         
-        if user.role != required_role and user.role != UserRole.ADMIN:
-            st.error(f"Access denied. Required role: {required_role.value}")
+        if not user.has_permission(required_role):
+            st.error(f"Access denied. Required minimum role: {required_role.value} (level {required_role.level})")
+            return False
+        
+        return True
+    
+    def require_exact_role(self, required_role: UserRole) -> bool:
+        """Require exact user role match"""
+        user = self.get_current_user()
+        if not user:
+            st.error("Authentication required")
+            return False
+        
+        if user.role != required_role:
+            st.error(f"Access denied. Required exact role: {required_role.value}")
             return False
         
         return True

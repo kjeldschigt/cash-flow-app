@@ -191,23 +191,31 @@ class AuthComponents:
     
     @staticmethod
     def require_role(required_role: UserRole) -> bool:
-        """Require specific user role."""
+        """Require minimum user role using hierarchy."""
         user = AuthComponents.get_current_user()
         if not user:
             return False
         
         user_role = UserRole(user['role'])
-        role_hierarchy = {
-            UserRole.VIEWER: 1,
-            UserRole.USER: 2,
-            UserRole.ADMIN: 3
-        }
         
-        user_level = role_hierarchy.get(user_role, 0)
-        required_level = role_hierarchy.get(required_role, 0)
+        # Use the role hierarchy from UserRole enum
+        if user_role.level < required_role.level:
+            st.error(f"Access denied. {required_role.value.title()} role (level {required_role.level}) or higher required.")
+            return False
         
-        if user_level < required_level:
-            st.error(f"Access denied. {required_role.value.title()} role required.")
+        return True
+    
+    @staticmethod
+    def require_exact_role(required_role: UserRole) -> bool:
+        """Require exact user role match."""
+        user = AuthComponents.get_current_user()
+        if not user:
+            return False
+        
+        user_role = UserRole(user['role'])
+        
+        if user_role != required_role:
+            st.error(f"Access denied. Exact role required: {required_role.value.title()}")
             return False
         
         return True

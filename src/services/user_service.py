@@ -7,8 +7,13 @@ from typing import Optional
 from ..models.user import User, UserRole
 from ..repositories.user_repository import UserRepository
 from ..repositories.base import DatabaseConnection
-
-logger = logging.getLogger(__name__)
+from ..security.encryption import SecureStorage
+try:
+    from ..security.pii_protection import get_structured_logger
+    logger = get_structured_logger().get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -46,7 +51,7 @@ class UserService:
         try:
             return self.user_repository.find_by_email(email)
         except Exception as e:
-            logger.error(f"Error retrieving user by email {email}: {str(e)}")
+            logger.error("Error retrieving user by email", operation="get_user_by_email", error_type=type(e).__name__)
             return None
     
     def get_user_by_username(self, username: str) -> Optional[User]:
@@ -54,7 +59,7 @@ class UserService:
         try:
             return self.user_repository.find_by_username(username)
         except Exception as e:
-            logger.error(f"Error retrieving user by username {username}: {str(e)}")
+            logger.error("Error retrieving user by username", operation="get_user_by_username", error_type=type(e).__name__)
             return None
     
     def authenticate(self, identifier: str, password: str) -> Optional[User]:
@@ -88,7 +93,7 @@ class UserService:
             return None
             
         except Exception as e:
-            logger.error(f"Authentication error for identifier {identifier}: {str(e)}")
+            logger.error("Authentication error", operation="authenticate", error_type=type(e).__name__)
             return None
     
     def get_all_active_users(self) -> list[User]:
