@@ -4,6 +4,10 @@ import sys
 import os
 import logging
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
+# Show full error details
+st.set_option("client.showErrorDetails", True)
 
 # Add src directory to path for imports
 src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
@@ -58,7 +62,7 @@ try:
     # Import new clean architecture components
     from src.container import configure_container, get_container
     from src.ui.auth import AuthComponents
-    from src.ui.components import UIComponents
+    from src.ui.components.components import UIComponents
     from src.config.settings import Settings
     from src.security import AuditLogger, AuditAction, DataEncryption, SecureStorage
 
@@ -191,7 +195,7 @@ def main_dashboard():
         from datetime import date
         from src.utils.date_utils import DateUtils
         
-        analytics_service = container.get_container().get_singleton('analytics_service')
+        analytics_service = container.get_singleton('analytics_service')
         if not analytics_service:
             # Fallback to creating service if not in container
             from src.services.analytics_service import AnalyticsService
@@ -230,7 +234,8 @@ def main_dashboard():
             )
     
     except Exception as e:
-        st.info("Navigate to specific pages using the sidebar to view detailed data and functionality.")
+        import traceback
+        st.error(traceback.format_exc())
 
 # Handle admin setup securely
 from src.utils.admin_setup import handle_admin_setup, show_setup_wizard

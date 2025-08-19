@@ -10,47 +10,49 @@ from src.services.settings_service import get_setting, set_setting, get_all_sett
 from src.ui.enhanced_auth import require_auth, get_current_user
 from src.models.user import UserRole
 from src.ui.api_key_management import render_api_key_management
+import traceback
 
-# Check authentication using new auth system
-current_user = get_current_user()
-if not current_user:
-    st.error("Please log in to access settings.")
-    st.stop()
+try:
+    # Check authentication using new auth system
+    current_user = get_current_user()
+    if not current_user:
+        st.error("Please log in to access settings.")
+        st.stop()
 
-st.title("⚙️ Settings")
+    st.title("⚙️ Settings")
 
-# Create main navigation tabs
-if current_user.role == UserRole.ADMIN:
-    tab1, tab2, tab3 = st.tabs(
-        ["🎛️ Application Settings", "🔌 Service Integrations", "📊 System Info"]
-    )
-else:
-    tab1, tab3 = st.tabs(["🎛️ Application Settings", "📊 System Info"])
-    tab2 = None
-
-# Service Integrations Tab (Admin only)
-if tab2 and current_user.role == UserRole.ADMIN:
-    with tab2:
-        from src.ui.enhanced_service_integrations import (
-            render_enhanced_service_integrations,
+    # Create main navigation tabs
+    if current_user.role == UserRole.ADMIN:
+        tab1, tab2, tab3 = st.tabs(
+            ["🎛️ Application Settings", "🔌 Service Integrations", "📊 System Info"]
         )
+    else:
+        tab1, tab3 = st.tabs(["🎛️ Application Settings", "📊 System Info"])
+        tab2 = None
 
-        render_enhanced_service_integrations()
+    # Service Integrations Tab (Admin only)
+    if tab2 and current_user.role == UserRole.ADMIN:
+        with tab2:
+            from src.ui.enhanced_service_integrations import (
+                render_enhanced_service_integrations,
+            )
 
-# Application Settings Tab
-with tab1:
-    # Theme toggle
-    current_theme = get_current_theme()
-    theme_options = {"Light": "light", "Dark": "dark"}
-    selected_theme = st.radio(
-        "Select Theme",
-        options=list(theme_options.keys()),
-        index=list(theme_options.keys()).index(
-            "Light" if current_theme == "light" else "Dark"
-        ),
-    )
-    if st.button("Apply Theme"):
-        apply_theme(theme_options[selected_theme])
+            render_enhanced_service_integrations()
+
+    # Application Settings Tab
+    with tab1:
+        # Theme toggle
+        current_theme = get_current_theme()
+        theme_options = {"Light": "light", "Dark": "dark"}
+        selected_theme = st.radio(
+            "Select Theme",
+            options=list(theme_options.keys()),
+            index=list(theme_options.keys()).index(
+                "Light" if current_theme == "light" else "Dark"
+            ),
+        )
+        if st.button("Apply Theme"):
+            apply_theme(theme_options[selected_theme])
 
     st.divider()
 
@@ -482,3 +484,6 @@ with tab3:
                     st.rerun()
         except Exception as e:
             st.error(f"Unable to load cache statistics: {str(e)}")
+
+except Exception:
+    st.error(traceback.format_exc())

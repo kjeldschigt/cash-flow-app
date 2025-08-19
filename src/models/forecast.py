@@ -6,7 +6,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator, ConfigDict, field_serializer
+from pydantic import BaseModel, Field, field_validator, ConfigDict, field_serializer, model_validator
 from pydantic_core.core_schema import FieldValidationInfo
 
 

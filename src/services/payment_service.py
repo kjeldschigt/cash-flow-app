@@ -193,6 +193,14 @@ class PaymentService:
         self.payment_repository.save(payment)
         return True
 
+    def get_revenue_breakdown(self, start_date=None, end_date=None):
+        """Development fallback for revenue breakdown."""
+        return []
+
+    def get_cost_breakdown(self, start_date=None, end_date=None):
+        """Development fallback for cost breakdown."""
+        return []
+
 
 class PaymentScheduleService:
     """Service for payment schedule operations."""
@@ -289,3 +297,11 @@ class PaymentScheduleService:
 
         schedule.updated_at = datetime.now()
         return self.payment_schedule_repository.save(schedule)
+
+    def get_revenue_breakdown(self, start_date=None, end_date=None):
+        """Development fallback for revenue breakdown."""
+        return []
+
+    def get_cost_breakdown(self, start_date=None, end_date=None):
+        """Development fallback for cost breakdown."""
+        return []

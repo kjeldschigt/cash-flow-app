@@ -44,7 +44,6 @@ class ThemeManager:
 
     # Custom CSS styles
     CUSTOM_CSS = """
-    <style>
     /* Main container styling */
     .main .block-container {
         padding-top: 2rem;
@@ -181,7 +180,6 @@ class ThemeManager:
             margin-bottom: 1rem;
         }
     }
-    </style>
     """
 
     def __init__(self):
@@ -226,13 +224,15 @@ class ThemeManager:
             css_vars += f"  --{css_var_name}: {value};\n"
         css_vars += "}\n"
 
-        return f"<style>{css_vars}{css}</style>"
+        # Strip any existing <style> tags
+        cleaned_css = css.replace("<style>", "").replace("</style>", "")
+        # Wrap once for Streamlit
+        return f"<style>{css_vars}{cleaned_css}</style>"
 
     def _apply_theme_specific_styles(self, theme_name: str) -> None:
         """Apply theme-specific additional styles."""
         if theme_name == "dark":
             dark_css = """
-            <style>
             /* Dark theme specific styles */
             .stApp {
                 background-color: #0e1117;
@@ -251,13 +251,11 @@ class ThemeManager:
                 background-color: #262730;
                 border-color: #4a4a4a;
             }
-            </style>
             """
             st.markdown(dark_css, unsafe_allow_html=True)
 
         elif theme_name == "financial":
             financial_css = """
-            <style>
             /* Financial theme specific styles */
             .metric-positive {
                 color: #27ae60 !important;
@@ -277,7 +275,6 @@ class ThemeManager:
                 font-weight: bold;
                 color: #27ae60;
             }
-            </style>
             """
             st.markdown(financial_css, unsafe_allow_html=True)
 

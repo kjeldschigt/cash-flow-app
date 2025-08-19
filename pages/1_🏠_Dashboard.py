@@ -9,6 +9,7 @@ from decimal import Decimal
 import sys
 import os
 import warnings
+import traceback
 
 # Add the src directory to the Python path
 src_path = os.path.join(os.path.dirname(__file__), "..", "src")
@@ -30,7 +31,7 @@ from components.ui_helpers import (
 # New clean architecture imports
 from src.container import get_container
 from src.ui.auth import AuthComponents
-from src.ui.components import UIComponents
+from src.ui.components.components import UIComponents
 from src.ui.forms import FormComponents
 from src.ui.components.charts import ChartComponents
 from src.services.error_handler import ErrorHandler
@@ -78,23 +79,23 @@ def generate_pdf(df, title):
         return None
 
 
-# Check authentication using new auth system
-if not AuthComponents.require_authentication():
-    st.stop()
-
-# Apply theme
-apply_theme("light")
-
-# Get services from container
-container = get_container()
-analytics_service = container.get_analytics_service()
-from src.services.error_handler import get_error_handler
-
-error_handler = get_error_handler()
-
-st.title("🏠 Dashboard")
-
 try:
+    # Check authentication using new auth system
+    if not AuthComponents.require_authentication():
+        st.stop()
+
+    # Apply theme
+    apply_theme("light")
+
+    # Get services from container
+    container = get_container()
+    analytics_service = container.get_analytics_service()
+    from src.services.error_handler import get_error_handler
+
+    error_handler = get_error_handler()
+
+    st.title("🏠 Dashboard")
+
     # Sidebar filters
     with st.sidebar:
         st.header("Dashboard Filters")
@@ -134,12 +135,12 @@ try:
 
         with col1:
             UIComponents.currency_metric(
-                "Total Revenue", cash_flow_metrics.total_revenue, "USD"
+                "Total Revenue", cash_flow_metrics.total_sales_usd, "USD"
             )
 
         with col2:
             UIComponents.currency_metric(
-                "Total Costs", cash_flow_metrics.total_costs, "USD"
+                "Total Costs", cash_flow_metrics.total_costs_usd, "USD"
             )
 
         with col3:
@@ -172,26 +173,26 @@ try:
 
             with col1:
                 UIComponents.metric_card(
-                    "Total Leads", str(business_metrics.total_leads), "this period"
+                    "Total Leads", str(getattr(business_metrics, 'total_leads', 0)), "this period"
                 )
 
             with col2:
                 UIComponents.metric_card(
                     "MQL Rate",
-                    f"{business_metrics.mql_rate:.1f}%",
-                    f"{business_metrics.mql}/{business_metrics.total_leads}",
+                    f"{getattr(business_metrics, 'mql_rate', 0):.1f}%",
+                    f"{getattr(business_metrics, 'mql', 0)}/{getattr(business_metrics, 'total_leads', 0)}",
                 )
 
             with col3:
                 UIComponents.metric_card(
                     "SQL Rate",
-                    f"{business_metrics.sql_rate:.1f}%",
-                    f"{business_metrics.sql}/{business_metrics.mql}",
+                    f"{getattr(business_metrics, 'sql_rate', 0):.1f}%",
+                    f"{getattr(business_metrics, 'sql', 0)}/{getattr(business_metrics, 'mql', 0)}",
                 )
 
             with col4:
                 UIComponents.currency_metric(
-                    "Total Costs", business_metrics.total_costs, "USD"
+                    "Total Costs", getattr(business_metrics, 'total_costs', 0), "USD"
                 )
 
         st.divider()
@@ -210,8 +211,10 @@ try:
             ChartComponents.cash_flow_chart(daily_trends, title="Daily Cash Flow Trend")
 
         # Monthly Summary Chart
+        start_date = date_range["start"]
         monthly_summary = analytics_service.get_monthly_summary(
-            start_date=date_range["start"], end_date=date_range["end"]
+            start_date.year,
+            start_date.month
         )
 
         if monthly_summary:
@@ -233,6 +236,5 @@ try:
             f"No financial data found for {range_select.lower()}. Add some transactions to see insights.",
         )
 
-except Exception as e:
-    error_result = error_handler.handle_exception(e, "dashboard_load")
-    UIComponents.error_message(error_result["message"])
+except Exception:
+    st.error(traceback.format_exc())

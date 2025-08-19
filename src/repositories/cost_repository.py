@@ -21,10 +21,17 @@ class CostRepository(BaseRepository[Cost]):
 
     def _row_to_model(self, row: sqlite3.Row) -> Cost:
         """Convert database row to Cost model."""
+        # Convert category with fallback
+        try:
+            category = CostCategory(row.get("category", "Unknown"))
+        except Exception:
+            # Fallback for invalid or unknown values (development data)
+            category = CostCategory.OTHER
+        
         return Cost(
             id=str(row["id"]),
             date=date.fromisoformat(row["date"]),
-            category=CostCategory(row["category"]),
+            category=category,
             amount_usd=Decimal(str(row["amount_usd"])),
             amount_crc=Decimal(str(row["amount_crc"])) if row["amount_crc"] else None,
             description=row["description"],
@@ -110,10 +117,17 @@ class RecurringCostRepository(BaseRepository[RecurringCost]):
 
     def _row_to_model(self, row: sqlite3.Row) -> RecurringCost:
         """Convert database row to RecurringCost model."""
+        # Convert category with fallback
+        try:
+            category = CostCategory(row.get("category", "Unknown"))
+        except Exception:
+            # Fallback for invalid or unknown values (development data)
+            category = CostCategory.OTHER
+        
         return RecurringCost(
             id=str(row["id"]),
             name=row["name"],
-            category=CostCategory(row["category"]),
+            category=category,
             currency=row["currency"],
             amount_expected=Decimal(str(row["amount_expected"])),
             comment=row["comment"],

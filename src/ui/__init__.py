@@ -11,7 +11,7 @@ from .auth import AuthComponents
 
 # Import UIComponents from components.py (not the components/ directory)
 try:
-    from .components import UIComponents
+    from .components.components import UIComponents
 except ImportError:
     # Fallback if there are import issues
     UIComponents = None

@@ -721,3 +721,38 @@ class ChartComponents:
     def apply_theme(self, fig: go.Figure, title: str = None) -> go.Figure:
         """Apply consistent theme to any chart"""
         return self.base_chart._apply_theme(fig, title)
+
+    @staticmethod
+    def monthly_trend_chart(data, title="Monthly Trend"):
+        """Development placeholder for monthly trend chart."""
+        st.info(f"{title} chart is not yet implemented.")
+
+    @staticmethod
+    def yearly_trend_chart(data, title="Yearly Trend"):
+        """Development placeholder for yearly trend chart."""
+        st.info(f"{title} chart is not yet implemented.")
+
+    @staticmethod
+    def revenue_category_pie(data, title="Revenue by Category"):
+        """Development placeholder for revenue category pie chart."""
+        st.info(f"{title} chart is not yet implemented.")
+
+    @staticmethod
+    def cost_category_pie(data, title="Cost by Category"):
+        """Development placeholder for cost category pie chart."""
+        st.info(f"{title} chart is not yet implemented.")
+
+    @staticmethod
+    def revenue_cost_comparison_chart(data, title="Revenue vs Cost Comparison"):
+        """Development placeholder for revenue vs cost comparison chart."""
+        st.info(f"{title} chart is not yet implemented.")
+
+    @staticmethod
+    def cash_flow_chart(data, title="Cash Flow Chart"):
+        """Development placeholder for cash flow chart."""
+        st.info(f"{title} chart is not yet implemented.")
+
+    @staticmethod
+    def category_breakdown_chart(data, title="Category Breakdown"):
+        """Development placeholder for category breakdown chart."""
+        st.info(f"{title} chart is not yet implemented.")

@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # New clean architecture imports
 from src.container import get_container
 from src.ui.auth import AuthComponents
-from src.ui.components import UIComponents
+from src.ui.components.components import UIComponents
 from src.ui.forms import FormComponents
 from src.ui.components.charts import ChartComponents
 from src.security import AuditLogger, AuditAction
@@ -25,25 +25,25 @@ from src.services.error_handler import handle_error
 
 # Legacy imports for theme
 from src.utils.theme_manager import apply_current_theme
-
-# Check authentication using new auth system
-if not AuthComponents.require_authentication():
-    st.stop()
-
-# Apply theme
-apply_current_theme()
-
-# Get services from container
-container = get_container()
-analytics_service = container.get_analytics_service()
-payment_service = container.get_payment_service()
-from src.services.error_handler import get_error_handler
-
-error_handler = get_error_handler()
-
-st.title("📈 Sales & Cash Flow Analysis")
+import traceback
 
 try:
+    # Check authentication using new auth system
+    if not AuthComponents.require_authentication():
+        st.stop()
+
+    # Apply theme
+    apply_current_theme()
+
+    # Get services from container
+    container = get_container()
+    analytics_service = container.get_analytics_service()
+    payment_service = container.get_payment_service()
+    from src.services.error_handler import get_error_handler
+
+    error_handler = get_error_handler()
+
+    st.title("📈 Sales & Cash Flow Analysis")
     # Sidebar filters
     with st.sidebar:
         st.header("Analysis Filters")
@@ -105,17 +105,17 @@ try:
         with col1:
             UIComponents.currency_metric(
                 "Total Revenue",
-                cash_flow_metrics.total_revenue,
+                cash_flow_metrics.total_sales_usd,
                 "USD",
-                delta=cash_flow_metrics.revenue_growth,
+                delta=getattr(cash_flow_metrics, "revenue_growth", 0),
             )
 
         with col2:
             UIComponents.currency_metric(
                 "Total Costs",
-                cash_flow_metrics.total_costs,
+                cash_flow_metrics.total_costs_usd,
                 "USD",
-                delta=cash_flow_metrics.cost_growth,
+                delta=getattr(cash_flow_metrics, "cost_growth", 0),
             )
 
         with col3:
@@ -123,7 +123,7 @@ try:
                 "Net Cash Flow",
                 cash_flow_metrics.net_cash_flow,
                 "USD",
-                delta=cash_flow_metrics.net_growth,
+                delta=getattr(cash_flow_metrics, "net_growth", 0),
             )
 
         with col4:
@@ -184,7 +184,8 @@ try:
             )
 
             monthly_summary = analytics_service.get_monthly_summary(
-                start_date=start_date, end_date=today
+                start_date.year,
+                start_date.month
             )
 
             if monthly_summary:
@@ -210,7 +211,7 @@ try:
                         "Revenue Growth",
                         yoy_comparison.current_revenue,
                         "USD",
-                        delta=yoy_comparison.revenue_growth_pct,
+                        delta=getattr(yoy_comparison, "revenue_growth_pct", 0),
                     )
 
                 with col2:
@@ -218,7 +219,7 @@ try:
                         "Cost Change",
                         yoy_comparison.current_costs,
                         "USD",
-                        delta=yoy_comparison.cost_growth_pct,
+                        delta=getattr(yoy_comparison, "cost_growth_pct", 0),
                     )
 
                 with col3:
@@ -226,7 +227,7 @@ try:
                         "Net Change",
                         yoy_comparison.current_net,
                         "USD",
-                        delta=yoy_comparison.net_growth_pct,
+                        delta=getattr(yoy_comparison, "net_growth_pct", 0),
                     )
 
     else:
@@ -235,6 +236,5 @@ try:
             f"No sales or cash flow data available for {date_range.lower()}. Add some transactions to see analytics.",
         )
 
-except Exception as e:
-    error_result = error_handler.handle_exception(e, "sales_analysis_load")
-    UIComponents.error_message(error_result["message"])
+except Exception:
+    st.error(traceback.format_exc())

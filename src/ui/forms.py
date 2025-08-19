@@ -152,7 +152,7 @@ class FormComponents:
         return password
 
     @staticmethod
-    def cost_form(
+    def cost_entry_form(
         submit_label: str = "Add Cost", initial_values: Optional[Dict[str, Any]] = None
     ) -> Optional[Dict[str, Any]]:
         """Complete cost entry form."""
@@ -360,4 +360,12 @@ class FormComponents:
 
                 return result_config
 
+        return None
+
+    @staticmethod
+    def integration_form():
+        """
+        Development fallback for integration form.
+        """
+        st.info("⚠️  Integration form is not implemented yet (dev placeholder).")
         return None

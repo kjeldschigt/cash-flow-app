@@ -39,13 +39,125 @@ class CostService:
         )
         return self.cost_repository.save(cost)
 
-    def get_costs_by_date_range(self, start_date: date, end_date: date) -> List[Cost]:
-        """Get costs within date range."""
-        return self.cost_repository.find_by_date_range(start_date, end_date)
+    def get_costs_by_date_range(self, start_date: date, end_date: date):
+        """Get costs within date range - returns dictionaries for development compatibility."""
+        try:
+            # Try to get Cost objects first
+            costs = self.cost_repository.find_by_date_range(start_date, end_date)
+            return costs
+        except Exception:
+            # Fallback to raw database query returning dictionaries
+            with self.cost_repository.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT * FROM {self.cost_repository._get_table_name()} WHERE date BETWEEN ? AND ? ORDER BY date DESC",
+                    (start_date.isoformat(), end_date.isoformat()),
+                )
+                rows = cursor.fetchall()
+                
+                # Convert to dictionaries with safe fallbacks
+                costs = []
+                for row in rows:
+                    cost = {
+                        "name": row.get("name", ""),
+                        "category": row.get("category", None),
+                        "amount": row.get("amount_usd", 0),
+                        "date": row.get("date", ""),
+                        "currency": row.get("currency", "USD"),
+                        "description": row.get("description", ""),
+                        "id": row.get("id", "")
+                    }
+                    costs.append(cost)
+                
+                return costs
+
+    def get_cost_breakdown(self, start_date: date, end_date: date, category: str = None):
+        """Get cost breakdown as DataFrame for compatibility with UI."""
+        import pandas as pd
+        
+        costs = self.get_costs_by_date_range(start_date, end_date)
+        
+        if not costs:
+            # Return empty DataFrame with required columns
+            return pd.DataFrame(columns=["date", "category", "amount", "description"])
+        
+        # Convert to DataFrame format expected by UI
+        data = []
+        for cost in costs:
+            # Handle both Cost objects and dictionaries
+            if isinstance(cost, dict):
+                data.append({
+                    "date": cost.get("date", ""),
+                    "category": cost.get("category", "Unknown"),
+                    "amount": float(cost.get("amount", 0)),
+                    "description": cost.get("description", ""),
+                    "currency": cost.get("currency", "USD")
+                })
+            else:
+                # Cost object
+                data.append({
+                    "date": cost.date.isoformat(),
+                    "category": cost.category.value if hasattr(cost.category, 'value') else str(cost.category),
+                    "amount": float(cost.amount_usd),
+                    "description": cost.description or "",
+                    "currency": "USD"
+                })
+        
+        df = pd.DataFrame(data)
+        
+        # Ensure required columns exist with fallbacks
+        if "category" not in df.columns:
+            df["category"] = "Unknown"
+        if "amount" not in df.columns:
+            df["amount"] = 0
+            
+        # Filter by category if specified
+        if category and category != "All":
+            df = df[df["category"] == category]
+            
+        return df
 
     def get_costs_by_category(self, category: CostCategory) -> List[Cost]:
         """Get costs by category."""
         return self.cost_repository.find_by_category(category)
+
+    def get_recent_costs(self, limit: int = 10):
+        """Get recent costs with limit - returns dictionaries for development compatibility."""
+        try:
+            # Try to get Cost objects first
+            with self.cost_repository.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC, created_at DESC LIMIT ?",
+                    (limit,)
+                )
+                rows = cursor.fetchall()
+                return [self.cost_repository._row_to_model(row) for row in rows]
+        except Exception:
+            # Fallback to raw database query returning dictionaries
+            with self.cost_repository.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC, created_at DESC LIMIT ?",
+                    (limit,)
+                )
+                rows = cursor.fetchall()
+                
+                # Convert to dictionaries with safe fallbacks
+                costs = []
+                for row in rows:
+                    cost = {
+                        "name": row.get("name", ""),
+                        "category": row.get("category", None),
+                        "amount": row.get("amount_usd", 0),
+                        "date": row.get("date", ""),
+                        "currency": row.get("currency", "USD"),
+                        "description": row.get("description", ""),
+                        "id": row.get("id", "")
+                    }
+                    costs.append(cost)
+                
+                return costs
 
     def get_unpaid_costs(self) -> List[Cost]:
         """Get unpaid costs."""
