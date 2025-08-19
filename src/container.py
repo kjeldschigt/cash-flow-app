@@ -23,6 +23,7 @@ from .services.payment_service import PaymentService, PaymentScheduleService
 from .services.cost_service import CostService, RecurringCostService
 from .services.integration_service import IntegrationService
 from .services.analytics_service import AnalyticsService
+from .services.loan_service import LoanService
 
 T = TypeVar("T")
 
@@ -82,6 +83,7 @@ class Container:
         self._services["recurring_cost_service"] = lambda: RecurringCostService(db)
         self._services["integration_service"] = lambda: IntegrationService(db, settings)
         self._services["analytics_service"] = lambda: AnalyticsService(db)
+        self._services["loan_service"] = lambda: LoanService(db)
 
     def get_user_service(self) -> UserService:
         """Get user service instance."""
@@ -124,6 +126,12 @@ class Container:
         if "analytics_service" not in self._singletons:
             self._singletons["analytics_service"] = self._services["analytics_service"]()
         return self._singletons["analytics_service"]
+
+    def get_loan_service(self) -> LoanService:
+        """Get loan service instance."""
+        if "loan_service" not in self._singletons:
+            self._singletons["loan_service"] = self._services["loan_service"]()
+        return self._singletons["loan_service"]
 
     def get_user_repository(self) -> UserRepository:
         """Get user repository instance."""

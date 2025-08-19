@@ -4,6 +4,7 @@ Cost service for cost and recurring cost management.
 
 from datetime import date, datetime
 from decimal import Decimal
+import sqlite3   # ← required for OperationalError fallback
 from typing import List, Optional, Dict, Any
 from ..models.cost import Cost, RecurringCost, CostCategory
 from ..repositories.cost_repository import CostRepository, RecurringCostRepository
@@ -96,7 +97,7 @@ class CostService:
             else:
                 # Cost object
                 data.append({
-                    "date": cost.date.isoformat(),
+                    "date": cost.cost_date.isoformat(),
                     "category": cost.category.value if hasattr(cost.category, 'value') else str(cost.category),
                     "amount": float(cost.amount_usd),
                     "description": cost.description or "",
@@ -127,20 +128,36 @@ class CostService:
             # Try to get Cost objects first
             with self.cost_repository.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC, created_at DESC LIMIT ?",
-                    (limit,)
-                )
+                # Development fallback: some dev databases don't have created_at column
+                try:
+                    cursor.execute(
+                        f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC, created_at DESC LIMIT ?",
+                        (limit,),
+                    )
+                except sqlite3.OperationalError:
+                    # Fallback to ordering only by date
+                    cursor.execute(
+                        f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC LIMIT ?",
+                        (limit,),
+                    )
                 rows = cursor.fetchall()
                 return [self.cost_repository._row_to_model(row) for row in rows]
         except Exception:
             # Fallback to raw database query returning dictionaries
             with self.cost_repository.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC, created_at DESC LIMIT ?",
-                    (limit,)
-                )
+                # Development fallback: some dev databases don't have created_at column
+                try:
+                    cursor.execute(
+                        f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC, created_at DESC LIMIT ?",
+                        (limit,),
+                    )
+                except sqlite3.OperationalError:
+                    # Fallback to ordering only by date
+                    cursor.execute(
+                        f"SELECT * FROM {self.cost_repository._get_table_name()} ORDER BY date DESC LIMIT ?",
+                        (limit,),
+                    )
                 rows = cursor.fetchall()
                 
                 # Convert to dictionaries with safe fallbacks

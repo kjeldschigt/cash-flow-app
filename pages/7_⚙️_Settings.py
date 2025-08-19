@@ -268,6 +268,10 @@ col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
     if st.button("Save Changes", type="primary"):
         try:
+            # Get values from session state with fallbacks
+            hk_usd = st.session_state.get("hk_usd", 0)
+            costa_usd = st.session_state.get("costa_usd", 0)
+            
             # Prepare settings data
             settings_data = {
                 "theme": st.session_state.get("theme", "light"),
@@ -289,10 +293,15 @@ with col1:
 
             save_settings_to_db(settings_data)
             st.success("Settings saved successfully to database!")
-            st.session_state.settings_saved = True
-
+            
         except Exception as e:
-            st.error(f"Error saving settings: {str(e)}")
+            from src.services.error_handler import ErrorHandler
+            error_handler = ErrorHandler()
+            error_handler.handle_error(e, "Failed to save settings")
+
+# Update session state after save attempt
+st.session_state.costa_usd = costa_usd
+st.session_state.hk_usd = hk_usd
 
 with col2:
     if st.button("Reset to Defaults", type="secondary"):

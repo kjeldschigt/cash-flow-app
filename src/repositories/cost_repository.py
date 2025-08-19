@@ -19,33 +19,40 @@ class CostRepository(BaseRepository[Cost]):
     def _get_model_class(self) -> Type[Cost]:
         return Cost
 
-    def _row_to_model(self, row: sqlite3.Row) -> Cost:
-        """Convert database row to Cost model."""
-        # Convert category with fallback
-        try:
-            category = CostCategory(row.get("category", "Unknown"))
-        except Exception:
-            # Fallback for invalid or unknown values (development data)
-            category = CostCategory.OTHER
-        
+    def _row_to_model(self, row: dict) -> Cost:
+        """
+        Convert a raw database row to a Cost instance.
+        Adds fallbacks for missing fields (useful in dev mode with empty DB).
+        """
+        # --- Fallbacks to avoid Pydantic validation errors ---
+        # ID as string
+        cost_id = str(row.get("id",""))
+
+        # cost_date fallback: use cost_date -> date -> today
+        cost_date = row.get("cost_date") or row.get("date") or date.today()
+
+        # category fallback: use valid category or default to "Other"
+        category = row.get("category") or "Other"
+
+        # amount fallback (for older DBs)
+        amount = row.get("amount_usd") or row.get("amount") or 0
+
+        # created_at / updated_at fallbacks
+        created_at = row.get("created_at") or datetime.now()
+        updated_at = row.get("updated_at") or datetime.now()
+
+        # description fallback
+        description = row.get("description") or ""
+
+        # Build and return Cost
         return Cost(
-            id=str(row["id"]),
-            date=date.fromisoformat(row["date"]),
+            id=cost_id,
+            cost_date=cost_date,
             category=category,
-            amount_usd=Decimal(str(row["amount_usd"])),
-            amount_crc=Decimal(str(row["amount_crc"])) if row["amount_crc"] else None,
-            description=row["description"],
-            is_paid=bool(row.get("is_paid", False)),
-            created_at=(
-                datetime.fromisoformat(row["created_at"])
-                if row.get("created_at")
-                else None
-            ),
-            updated_at=(
-                datetime.fromisoformat(row["updated_at"])
-                if row.get("updated_at")
-                else None
-            ),
+            amount_usd=amount,
+            created_at=created_at,
+            updated_at=updated_at,
+            description=description,
         )
 
     def _model_to_dict(self, model: Cost) -> dict:

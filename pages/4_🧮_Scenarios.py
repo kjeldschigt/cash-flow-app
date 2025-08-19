@@ -25,6 +25,8 @@ from src.services.error_handler import show_error
 from src.services.fx_service import get_rate_scenarios, get_monthly_rate
 from src.services.settings_service import get_setting
 from src.ui.auth import AuthComponents
+from src.ui.components.components import UIComponents
+from src.services.error_handler import handle_error
 
 # Check authentication using new auth system
 if not AuthComponents.require_authentication():
@@ -32,8 +34,7 @@ if not AuthComponents.require_authentication():
 
 # Apply theme
 theme = get_setting("theme", "light")
-st.markdown(apply_theme(theme), unsafe_allow_html=True)
-
+apply_theme(theme)
 
 def fetch_macro():
     """Stub function for future macro data API calls"""
@@ -43,20 +44,27 @@ def fetch_macro():
         "last_updated": "Aug 2025",
     }
 
-
-st.title("🧮 Scenario Planning & Projections")
+UIComponents.page_header("📊 Scenarios", "Analyze and plan financial scenarios.")
 
 try:
     # Initialize and load data
     init_session_filters()
 
     with st.spinner("Loading scenario data..."):
-        df = load_combined_data()
+        scenario_data = load_combined_data()
+        # Normalize to DataFrame if needed
+        if isinstance(scenario_data, list):
+            scenario_data = pd.DataFrame(scenario_data)
+        elif isinstance(scenario_data, dict):
+            scenario_data = pd.DataFrame([scenario_data])
         fx_rates = get_rate_scenarios()
         macro_data = fetch_macro()
+        
+        # Use scenario_data as df for backward compatibility
+        df = scenario_data
 
         # Get base metrics
-        if not df.empty and "Sales_USD" in df.columns:
+        if isinstance(df, pd.DataFrame) and not df.empty and "Sales_USD" in df.columns:
             avg_monthly_sales = df["Sales_USD"].mean()
             avg_monthly_costs = (
                 df["Costs_USD"].mean() if "Costs_USD" in df.columns else 0
@@ -222,7 +230,12 @@ try:
 
         # Calculate costs with FX impact
         costa_usd_annual = adj_costa_usd * 12 * (1.02) ** year
-        costa_crc_usd_annual = (adj_costa_crc * 12 * (1.02) ** year) / fx_years[year]
+        # Safe access to fx_years with fallback
+        if year in fx_years:
+            fx_rate = fx_years[year]
+        else:
+            fx_rate = 502.0 + (year - 1) * 8.0  # Default fallback rate
+        costa_crc_usd_annual = (adj_costa_crc * 12 * (1.02) ** year) / fx_rate
         hk_usd_annual = adj_hk_usd * 12 * (1.02) ** year
         google_ads_annual = (
             adj_google_ads * 12 * economy_ads_multiplier * (1.03) ** year
@@ -239,7 +252,7 @@ try:
                 "Projected Sales": economy_adjusted_sales,
                 "Projected Costs": total_annual_costs,
                 "Net Cash Flow": annual_net,
-                "FX Rate": fx_years[year],
+                "FX Rate": fx_rate,
             }
         )
 
@@ -346,16 +359,26 @@ try:
     st.subheader("FX Impact Analysis")
 
     fx_impact_data = []
-    base_year_usd_cost = costa_crc_base / fx_years[1]
+    # Safe access to fx_years for FX Impact Analysis
+    if 1 in fx_years:
+        base_year_usd_cost = costa_crc_base / fx_years[1]
+    else:
+        base_year_usd_cost = costa_crc_base / 502.0  # Default fallback
 
     for year in range(1, 6):
-        usd_cost = costa_crc_base / fx_years[year]
+        # Safe access to fx_years with fallback
+        if year in fx_years:
+            fx_rate = fx_years[year]
+        else:
+            fx_rate = 502.0 + (year - 1) * 8.0  # Default fallback rate
+            
+        usd_cost = costa_crc_base / fx_rate
         delta_vs_year1 = usd_cost - base_year_usd_cost
 
         fx_impact_data.append(
             {
                 "Year": year,
-                "FX Rate": fx_years[year],
+                "FX Rate": fx_rate,
                 "USD Cost": f"${usd_cost:,.0f}",
                 "Delta vs Year 1": f"${delta_vs_year1:+,.0f}",
             }
@@ -366,8 +389,5 @@ try:
     st.caption("CRC cost conversion impact over projection period")
 
 except Exception as e:
-    show_error(
-        "Scenario Analysis Error",
-        f"An error occurred while loading the scenario analysis: {str(e)}",
-    )
-    st.info("Please check your data connections and try again.")
+    handle_error(e, "An error occurred while loading the scenario analysis")
+    scenario_data = pd.DataFrame()  # safe fallback

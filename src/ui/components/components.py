@@ -14,6 +14,22 @@ import plotly.graph_objects as go
 class UIComponents:
     """Collection of reusable UI components."""
 
+    # --- Basic placeholder pie chart ---
+    @staticmethod
+    def create_pie_chart(values, labels, title=""):
+        import plotly.express as px
+        df = pd.DataFrame({"labels": labels, "values": values})
+        fig = px.pie(df, names="labels", values="values", title=title)
+        return fig
+
+    # --- Basic placeholder line chart ---
+    @staticmethod
+    def create_line_chart(x_data, y_data, title="", x_label="", y_label=""):
+        import plotly.graph_objects as go
+        fig = go.Figure(data=go.Scatter(x=x_data, y=y_data, mode="lines"))
+        fig.update_layout(title=title, xaxis_title=x_label, yaxis_title=y_label)
+        return fig
+
     @staticmethod
     def metric_card(
         title: str,
@@ -79,27 +95,24 @@ class UIComponents:
         )
 
     @staticmethod
-    def data_table(
-        data: pd.DataFrame,
-        title: Optional[str] = None,
-        use_container_width: bool = True,
-        hide_index: bool = True,
-        column_config: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """Display a formatted data table."""
-        if title:
-            st.subheader(title)
+    def data_table(data, caption=""):
+        """
+        Render a basic table from a pandas DataFrame or a list of dictionaries.
+        """
+        import pandas as pd
+        # Normalize list -> DataFrame
+        if isinstance(data, list):
+            df = pd.DataFrame(data)
+        else:
+            df = data
 
-        if data.empty:
-            st.info("No data available")
+        if df is None or df.empty:
+            st.write("No data to display")
             return
 
-        st.dataframe(
-            data,
-            use_container_width=use_container_width,
-            hide_index=hide_index,
-            column_config=column_config,
-        )
+        st.dataframe(df, use_container_width=True)
+        if caption:
+            st.caption(caption)
 
     @staticmethod
     def success_message(message: str) -> None:

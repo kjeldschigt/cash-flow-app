@@ -194,7 +194,8 @@ if cost_analytics:
     if isinstance(cost_breakdown, list):
         cost_breakdown = pd.DataFrame(cost_breakdown)
 
-    if cost_breakdown:
+    # Handle list or empty DataFrame safely
+    if isinstance(cost_breakdown, pd.DataFrame) and not cost_breakdown.empty:
         col1, col2 = st.columns(2)
 
         with col1:
@@ -305,11 +306,11 @@ if cost_analytics:
                 # Cost object
                 cost_data.append(
                     {
-                        "Date": cost.date.strftime("%Y-%m-%d"),
-                        "Description": cost.description,
-                        "Category": cost.category,
-                        "Amount": f"{cost.currency} {cost.amount:,.2f}",
-                        "Notes": cost.notes or "",
+                        "Date": cost.cost_date.strftime("%Y-%m-%d"),
+                        "Description": getattr(cost, "description", ""),
+                        "Category": str(cost.category),
+                        "Amount": f"USD {float(cost.amount_usd):,.2f}",
+                        "Notes": getattr(cost, "notes", ""),
                     }
                 )
 

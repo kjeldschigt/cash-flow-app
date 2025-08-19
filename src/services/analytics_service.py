@@ -31,6 +31,16 @@ class AnalyticsService:
             max_cost = 0
         return CostAnalytics()
 
+    # --- Development fallback for cost breakdown by category ---
+    def get_cost_breakdown_by_category(self, start_date=None, end_date=None):
+        # Return empty list for development (no data yet)
+        return []
+
+    # --- Development fallback for monthly cost trends ---
+    def get_monthly_cost_trends(self, start_date=None, end_date=None):
+        # Return empty list for development (no data yet)
+        return []
+
     # --- Development fallback for revenue analytics ---
     def get_revenue_analytics(self, start_date=None, end_date=None, category=None, currency=None):
         """

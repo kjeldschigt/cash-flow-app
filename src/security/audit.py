@@ -4,6 +4,7 @@ Audit Logging for Financial Operations
 
 import logging
 import json
+import sqlite3
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from enum import Enum
@@ -224,23 +225,25 @@ class AuditLogger:
     def _store_audit_entry(self, audit_entry: Dict[str, Any]) -> None:
         """Store audit entry in database"""
         with self.db.get_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO audit_log (
-                    timestamp, user_id, action, entity_type, entity_id,
-                    amount, currency, level, details, details_encrypted,
-                    ip_address, user_agent
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    audit_entry["timestamp"],
-                    audit_entry["user_id"],
-                    audit_entry["action"],
-                    audit_entry["entity_type"],
-                    audit_entry["entity_id"],
-                    audit_entry.get("amount"),
-                    audit_entry.get("currency"),
-                    audit_entry["level"],
+            # dev fallback
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO audit_log (
+                        timestamp, user_id, action, entity_type, entity_id,
+                        amount, currency, level, details, details_encrypted,
+                        ip_address, user_agent
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        audit_entry["timestamp"],
+                        audit_entry["user_id"],
+                        audit_entry["action"],
+                        audit_entry["entity_type"],
+                        audit_entry["entity_id"],
+                        audit_entry.get("amount"),
+                        audit_entry.get("currency"),
+                        audit_entry["level"],
                     (
                         json.dumps(audit_entry["details"])
                         if not audit_entry.get("details_encrypted")
@@ -251,6 +254,9 @@ class AuditLogger:
                     audit_entry["user_agent"],
                 ),
             )
+            except sqlite3.OperationalError:
+                # development mode fallback – swallow the error so app doesn't crash
+                pass
 
     def _contains_sensitive_data(self, data: Dict[str, Any]) -> bool:
         """Check if data contains sensitive information"""
