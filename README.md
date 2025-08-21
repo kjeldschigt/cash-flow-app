@@ -35,6 +35,51 @@ A comprehensive financial management dashboard built with Streamlit for tracking
 - **📱 PWA Support**: Offline capabilities and mobile-responsive design
 - **🔍 Analytics**: Advanced reporting, data visualization, and business intelligence
 
+## 🌐 API Endpoints
+
+The application provides a RESTful API for programmatic access to financial data and operations. The API is built with FastAPI and includes interactive documentation.
+
+### Base URL
+```
+http://localhost:8000/api/v1
+```
+
+### Available Endpoints
+
+#### Test Webhook Endpoints
+These endpoints simulate various webhook events for testing:
+
+1. **Simulate Stripe Payout**
+   ```
+   POST /zapier/test/stripe_payout
+   ```
+   Simulates an incoming Stripe payment with random data.
+
+2. **Simulate Incoming Wire Transfer**
+   ```
+   POST /zapier/test/incoming_wire
+   ```
+   Simulates an incoming wire transfer with random data.
+
+3. **Simulate Outgoing Payment**
+   ```
+   POST /zapier/test/outgoing_ocbc
+   ```
+   Simulates an outgoing payment to a random vendor.
+
+### Interactive API Documentation
+- **Swagger UI**: Visit `/docs` (e.g., http://localhost:8000/docs)
+- **ReDoc**: Visit `/redoc` (e.g., http://localhost:8000/redoc)
+
+### Running the API Server
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the FastAPI server
+uvicorn fastapi_app:app --reload
+```
+
 ## 🚀 Quick Start
 
 ### **Prerequisites**

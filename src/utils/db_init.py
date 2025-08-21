@@ -5,6 +5,7 @@ import sqlite3
 import logging
 from typing import Dict, Any
 from datetime import datetime
+from src.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +53,7 @@ def get_database_info() -> Dict[str, Any]:
     }
 
     try:
-        db_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "cash_flow.db"
-        )
+        db_path = Settings().database.absolute_path
 
         if os.path.exists(db_path):
             info["exists"] = True
@@ -90,9 +89,7 @@ def initialize_database() -> Dict[str, Any]:
         return legacy_init()
     except ImportError:
         # Fallback implementation
-        db_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "cash_flow.db"
-        )
+        db_path = Settings().database.absolute_path
 
         try:
             conn = sqlite3.connect(db_path)

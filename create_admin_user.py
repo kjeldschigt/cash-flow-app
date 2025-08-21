@@ -21,8 +21,10 @@ def create_admin_user():
         # Create admin user
         admin_user = User.create("admin@example.com", "admin123", UserRole.ADMIN, "admin")
         
-        # Connect to database
-        conn = sqlite3.connect("cash_flow.db")
+        # Connect to database using canonical Settings path
+        from src.config.settings import Settings
+        db_path = Settings().database.path
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Insert admin user

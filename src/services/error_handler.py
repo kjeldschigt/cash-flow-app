@@ -4,7 +4,11 @@ Error handling service for comprehensive error management.
 
 import logging
 import uuid
-import streamlit as st
+# Streamlit is optional for non-UI contexts (e.g., CLI smoke tests)
+try:
+    import streamlit as st  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    st = None  # type: ignore
 from typing import Optional, Any, Dict
 from datetime import datetime
 from enum import Enum
@@ -243,7 +247,6 @@ def handle_error(exception: Exception, message: str = None, context: str = None)
         message: Custom error message
         context: Context where error occurred
     """
-    import streamlit as st
     import uuid
     import logging
 
@@ -265,19 +268,28 @@ def handle_error(exception: Exception, message: str = None, context: str = None)
         operation="handle_error",
     )
 
-    # Show user-friendly message in Streamlit
+    # Show user-friendly message in Streamlit if available; else print to stdout
     user_message = message or "An unexpected error occurred"
-    st.error(f"❌ {user_message} (Error ID: {error_id})")
+    if st is not None:
+        st.error(f"❌ {user_message} (Error ID: {error_id})")
+    else:
+        print(f"❌ {user_message} (Error ID: {error_id})")
 
     # In development, show more details
     import os
 
     if os.getenv("ENVIRONMENT", "development") == "development":
-        with st.expander("🔍 Error Details (Development Mode)"):
-            st.code(f"Exception: {type(exception).__name__}: {str(exception)}")
+        if st is not None:
+            with st.expander("🔍 Error Details (Development Mode)"):
+                st.code(f"Exception: {type(exception).__name__}: {str(exception)}")
+                if context:
+                    st.code(f"Context: {context}")
+                st.code(f"Error ID: {error_id}")
+        else:
+            print(f"Exception: {type(exception).__name__}: {str(exception)}")
             if context:
-                st.code(f"Context: {context}")
-            st.code(f"Error ID: {error_id}")
+                print(f"Context: {context}")
+            print(f"Error ID: {error_id}")
 
     return error_id
 
@@ -312,9 +324,10 @@ def show_error(message: str, exception: Exception = None):
         message: Error message to display
         exception: Optional exception object
     """
-    import streamlit as st
-
     if exception:
         handle_error(exception, message)
     else:
-        st.error(f"❌ {message}")
+        if st is not None:
+            st.error(f"❌ {message}")
+        else:
+            print(f"❌ {message}")

@@ -17,13 +17,14 @@ def test_complete_authentication():
     try:
         from src.models.user import User, UserRole
         from src.repositories.base import DatabaseConnection
+        from src.config.settings import Settings
         from src.repositories.user_repository import UserRepository
         from src.services.user_service import UserService
         
         print("\n--- Testing Repository Layer ---")
         
-        # Initialize repository
-        db_connection = DatabaseConnection("cash_flow.db")
+        # Initialize repository using canonical DB path
+        db_connection = DatabaseConnection(Settings().database.path)
         user_repo = UserRepository(db_connection)
         
         # Test find_by_email

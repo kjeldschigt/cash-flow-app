@@ -3,7 +3,7 @@ import sys
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,8 +39,8 @@ if "edit_integration" not in st.session_state:
     st.session_state.edit_integration = None
 
 # Tab navigation
-tab1, tab2, tab3 = st.tabs(
-    ["Manage Integrations", "Add Integration", "Test Webhook Payload"]
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["Manage Integrations", "Add Integration", "Test Webhook Payload", "Stripe"]
 )
 
 with tab1:
@@ -174,3 +174,85 @@ with tab3:
 
     except Exception as e:
         st.error(traceback.format_exc())
+
+with tab4:
+    UIComponents.section_header("Stripe", "Import Stripe payouts into the cash ledger")
+    try:
+        stripe_service = container.get_stripe_service()
+        bank_service = container.get_bank_service()
+
+        # API key status
+        api_key = os.environ.get("STRIPE_API_KEY", "")
+        if api_key:
+            masked = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "********"
+            st.success(f"Stripe API key detected in environment: {masked}")
+        else:
+            st.info("Set STRIPE_API_KEY in your environment to enable Stripe integration.")
+
+        # Date range
+        col_a, col_b = st.columns(2)
+        with col_a:
+            start_date = st.date_input("Start date", value=date.today() - timedelta(days=90))
+        with col_b:
+            end_date = st.date_input("End date", value=date.today())
+
+        # Bank account selection for tagging payouts
+        accounts = []
+        try:
+            accounts = bank_service.list_accounts() or []
+        except Exception as e:
+            error_handler.handle_error(e, user_message="Unable to load bank accounts")
+            accounts = []
+
+        account_options = ["— None —"] + [f"{a.get('name')} ({a.get('currency','USD')}) | {a.get('id')}" for a in accounts]
+        sel = st.selectbox("Tag imported payouts to bank account", options=account_options, index=0)
+        selected_bank_id = None
+        if sel != "— None —":
+            try:
+                selected_bank_id = sel.split("|")[-1].strip()
+            except Exception:
+                selected_bank_id = None
+
+        # Actions
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("Fetch Recent Payouts"):
+                payouts = stripe_service.fetch_payouts(start_date, end_date)
+                if payouts:
+                    st.session_state["stripe_payouts_preview"] = payouts
+                    st.success(f"Fetched {len(payouts)} payouts")
+                else:
+                    st.info("No payouts found for selected range.")
+        with col2:
+            if st.button("Import Stripe Payouts", type="primary"):
+                result = stripe_service.import_payouts_to_ledger(
+                    bank_account_id=selected_bank_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                st.success(f"Imported: {result.get('created',0)} new, Skipped: {result.get('skipped',0)}")
+                st.rerun()
+
+        # Recent payouts table (preview or live fetch if not cached)
+        payouts = st.session_state.get("stripe_payouts_preview") if "stripe_payouts_preview" in st.session_state else stripe_service.fetch_payouts(start_date, end_date)
+        if payouts:
+            # Sort by date desc and limit to 20
+            try:
+                payouts_sorted = sorted(payouts, key=lambda x: x.get("date"), reverse=True)[:20]
+            except Exception:
+                payouts_sorted = payouts[:20]
+            rows = [
+                {
+                    "Date": p.get("date").isoformat() if isinstance(p.get("date"), date) else str(p.get("date")),
+                    "Amount": f"{p.get('amount',0):,.2f} {p.get('currency','').upper()}",
+                    "Status": p.get("status", ""),
+                    "Payout ID": p.get("payout_id", ""),
+                }
+                for p in payouts_sorted
+            ]
+            st.caption("Recent Payouts (max 20)")
+            st.table(rows)
+        else:
+            st.info("No payouts to display.")
+    except Exception as e:
+        error_handler.handle_error(e, user_message="Stripe section error")

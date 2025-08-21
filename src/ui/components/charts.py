@@ -748,11 +748,143 @@ class ChartComponents:
         st.info(f"{title} chart is not yet implemented.")
 
     @staticmethod
-    def cash_flow_chart(data, title="Cash Flow Chart"):
-        """Development placeholder for cash flow chart."""
-        st.info(f"{title} chart is not yet implemented.")
+    def cash_flow_chart(
+        df: pd.DataFrame,
+        title: str = "Cash Flow",
+        date_column: str = "date",
+        inflow_column: str = "inflow",
+        outflow_column: str = "outflow",
+    ):
+        """Render a cash flow chart with flexible column naming.
+
+        Renames provided columns to the standard schema expected by CashFlowChart.render
+        and delegates rendering.
+        """
+        try:
+            if df is None or df.empty:
+                st.warning("No cash flow data available")
+                return
+
+            # Prepare rename map; only include keys that actually exist
+            rename_map = {}
+            if date_column in df.columns and date_column != "date":
+                rename_map[date_column] = "date"
+            if inflow_column in df.columns and inflow_column != "inflow":
+                rename_map[inflow_column] = "inflow"
+            if outflow_column in df.columns and outflow_column != "outflow":
+                rename_map[outflow_column] = "outflow"
+
+            data = df.rename(columns=rename_map)
+
+            # Ensure required columns exist
+            missing = [c for c in ["date", "inflow"] if c not in data.columns]
+            if missing:
+                st.warning(f"Missing required columns for cash flow chart: {', '.join(missing)}")
+                return
+            if "outflow" not in data.columns:
+                # Gracefully default to zero outflows
+                data = data.copy()
+                data["outflow"] = 0.0
+
+            return CashFlowChart.render(
+                data,
+                date_column="date",
+                inflow_column="inflow",
+                outflow_column="outflow",
+                title=title,
+            )
+        except Exception as e:
+            # Graceful error display without crashing the page
+            st.warning(f"Unable to render cash flow chart: {e}")
 
     @staticmethod
     def category_breakdown_chart(data, title="Category Breakdown"):
         """Development placeholder for category breakdown chart."""
         st.info(f"{title} chart is not yet implemented.")
+
+    @staticmethod
+    def sales_line_chart(
+        df: pd.DataFrame,
+        title: str = "Daily Sales (Bookings)",
+        date_column: str = "date",
+        value_column: str = "total_amount",
+        # Optional comparison overlay
+        comp_df: Optional[pd.DataFrame] = None,
+        comp_date_column: str = "date",
+        comp_value_column: str = "total_amount",
+        comp_label: str = "Comparison",
+    ):
+        """Render a daily sales (bookings) line chart with flexible columns.
+
+        Expects a DataFrame with a date column and a numeric value column representing
+        total daily booking amounts. Additional columns are ignored.
+        """
+        try:
+            if df is None or df.empty:
+                st.warning("No bookings sales data available")
+                return
+
+            # Prepare rename map for flexible columns
+            rename_map = {}
+            if date_column in df.columns and date_column != "date":
+                rename_map[date_column] = "date"
+            if value_column in df.columns and value_column != "value":
+                rename_map[value_column] = "value"
+
+            data = df.rename(columns=rename_map)
+
+            # Ensure required columns
+            if "date" not in data.columns or "value" not in data.columns:
+                st.warning("Missing required columns for sales chart: date, value")
+                return
+
+            data = data.copy()
+            data["date"] = pd.to_datetime(data["date"])  # ensure datetime
+            data = data.sort_values("date")
+
+            fig = go.Figure()
+
+            # Current period line
+            fig.add_trace(
+                go.Scatter(
+                    x=data["date"],
+                    y=data["value"],
+                    mode="lines+markers",
+                    name="Sales (Bookings)",
+                    line=dict(color="#4169E1", width=3),
+                    marker=dict(size=6),
+                    hovertemplate="<b>Sales</b><br>" + "Date: %{x}<br>" + "Amount: $%{y:,.2f}<extra></extra>",
+                )
+            )
+
+            # Optional comparison overlay
+            if comp_df is not None and not comp_df.empty:
+                comp_map = {}
+                if comp_date_column in comp_df.columns and comp_date_column != "date":
+                    comp_map[comp_date_column] = "date"
+                if comp_value_column in comp_df.columns and comp_value_column != "value":
+                    comp_map[comp_value_column] = "value"
+                comp_data = comp_df.rename(columns=comp_map).copy()
+                if "date" in comp_data.columns and "value" in comp_data.columns:
+                    comp_data["date"] = pd.to_datetime(comp_data["date"])  # ensure datetime
+                    comp_data = comp_data.sort_values("date")
+                    fig.add_trace(
+                        go.Scatter(
+                            x=comp_data["date"],
+                            y=comp_data["value"],
+                            mode="lines+markers",
+                            name=comp_label,
+                            line=dict(color="#A9A9A9", width=2, dash="dash"),
+                            marker=dict(size=5, color="#A9A9A9"),
+                            hovertemplate="<b>" + comp_label + "</b><br>" + "Date: %{x}<br>" + "Amount: $%{y:,.2f}<extra></extra>",
+                        )
+                    )
+
+            fig = BaseChart._apply_theme(fig, title)
+            fig.update_layout(xaxis_title="Date", yaxis_title="Sales ($)", hovermode="x unified")
+
+            st.plotly_chart(fig, use_container_width=True)
+
+            BaseChart._add_export_buttons(fig, "sales_bookings")
+        except Exception as e:
+            st.warning(f"Unable to render sales chart: {e}")

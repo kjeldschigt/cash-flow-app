@@ -5,10 +5,11 @@ Migration script to add missing columns to users table.
 
 import sqlite3
 import os
+from src.config.settings import Settings
 
 def migrate_users_table():
     """Add missing columns to users table."""
-    db_path = "cash_flow.db"
+    db_path = Settings().database.path
     
     if not os.path.exists(db_path):
         print("❌ Database file does not exist")

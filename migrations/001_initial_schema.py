@@ -6,10 +6,11 @@ Creates all core tables for the cash flow application
 import sqlite3
 from datetime import datetime
 import os
+from src.config.settings import Settings
 
 def get_db_path():
     """Get the database path"""
-    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cash_flow.db')
+    return Settings().database.path
 
 def up():
     """Apply the migration"""

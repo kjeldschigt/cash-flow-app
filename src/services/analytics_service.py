@@ -10,6 +10,8 @@ from ..models.analytics import CashFlowMetrics, BusinessMetrics, FXRateData
 from ..repositories.base import DatabaseConnection
 from ..utils.date_utils import DateUtils
 from ..utils.currency_utils import CurrencyUtils
+from .error_handler import get_error_handler
+from ..analytics.compare_utils import make_daily_index
 
 
 class AnalyticsService:
@@ -17,6 +19,7 @@ class AnalyticsService:
 
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+        self.error_handler = get_error_handler()
 
     # --- Development fallback for cost analytics ---
     def get_cost_analytics(self, start_date=None, end_date=None, category=None, currency=None):
@@ -299,6 +302,474 @@ class AnalyticsService:
                 - previous_metrics.net_cash_flow,
             },
         }
+
+    # --- New: Airtable-backed analytics ---
+    def bookings_by_date(self, start_date: date, end_date: date) -> pd.DataFrame:
+        """Aggregate bookings by booking_date with sums and counts.
+
+        Returns a DataFrame with columns: date, total_amount, total_guests, bookings_count
+        """
+        try:
+            with self.db.get_connection() as conn:
+                query = (
+                    """
+                    SELECT booking_date AS date,
+                           SUM(amount)        AS total_amount,
+                           SUM(guests)        AS total_guests,
+                           COUNT(*)           AS bookings_count
+                      FROM bookings
+                     WHERE booking_date BETWEEN ? AND ?
+                  GROUP BY booking_date
+                  ORDER BY booking_date
+                    """
+                )
+                rows = conn.execute(
+                    query, (start_date.isoformat(), end_date.isoformat())
+                ).fetchall()
+                data = [
+                    {
+                        "date": r["date"],
+                        "total_amount": float(r["total_amount"] or 0.0),
+                        "total_guests": int(r["total_guests"] or 0),
+                        "bookings_count": int(r["bookings_count"] or 0),
+                    }
+                    for r in rows
+                ]
+                return pd.DataFrame(data)
+        except Exception as e:
+            # Consistent error handling
+            self.error_handler.handle_database_error(
+                e, operation="bookings_by_date", affected_table="bookings"
+            )
+            return pd.DataFrame(columns=["date", "total_amount", "total_guests", "bookings_count"])
+
+    def bookings_by_date_daily(self, start_date: date, end_date: date) -> pd.DataFrame:
+        """Return daily-indexed bookings data with zero-filled gaps.
+
+        Columns: date, total_amount, total_guests, bookings_count.
+        Ensures a continuous daily range between start_date and end_date.
+        """
+        try:
+            df = self.bookings_by_date(start_date, end_date)
+            # Zero-fill missing days across standard booking metrics
+            daily = make_daily_index(
+                df,
+                start=start_date,
+                end=end_date,
+                value_cols=["total_amount", "total_guests", "bookings_count"],
+            )
+            return daily
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="bookings_by_date_daily", affected_table="bookings"
+            )
+            return pd.DataFrame(columns=["date", "total_amount", "total_guests", "bookings_count"])
+
+    def bookings_summary(self, start_date: date, end_date: date) -> Dict[str, Any]:
+        """Return total sales amount, bookings count, and average booking amount for date range.
+
+        Sums are based on the `bookings` table and filtered by `booking_date`.
+        """
+        try:
+            with self.db.get_connection() as conn:
+                row = conn.execute(
+                    """
+                    SELECT SUM(amount)   AS total_amount,
+                           COUNT(*)      AS bookings_count,
+                           AVG(amount)   AS avg_amount
+                      FROM bookings
+                     WHERE booking_date BETWEEN ? AND ?
+                    """,
+                    (start_date.isoformat(), end_date.isoformat()),
+                ).fetchone()
+
+                total = float(row["total_amount"] or 0.0)
+                count = int(row["bookings_count"] or 0)
+                avg = float(row["avg_amount"] or 0.0)
+                return {
+                    "total_amount": total,
+                    "bookings_count": count,
+                    "avg_booking_amount": avg,
+                }
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="bookings_summary", affected_table="bookings"
+            )
+            return {"total_amount": 0.0, "bookings_count": 0, "avg_booking_amount": 0.0}
+
+    def bookings_by_month(self, start_date: date, end_date: date) -> pd.DataFrame:
+        """Return monthly aggregated bookings data.
+
+        Columns: month (YYYY-MM), total_amount, total_guests, bookings_count
+        """
+        try:
+            with self.db.get_connection() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT SUBSTR(booking_date, 1, 7) AS month,
+                           SUM(amount)                 AS total_amount,
+                           SUM(guests)                 AS total_guests,
+                           COUNT(*)                    AS bookings_count
+                      FROM bookings
+                     WHERE booking_date BETWEEN ? AND ?
+                  GROUP BY SUBSTR(booking_date, 1, 7)
+                  ORDER BY month
+                    """,
+                    (start_date.isoformat(), end_date.isoformat()),
+                ).fetchall()
+
+                data = [
+                    {
+                        "month": r["month"],
+                        "total_amount": float(r["total_amount"] or 0.0),
+                        "total_guests": int(r["total_guests"] or 0),
+                        "bookings_count": int(r["bookings_count"] or 0),
+                    }
+                    for r in rows
+                ]
+                return pd.DataFrame(data)
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="bookings_by_month", affected_table="bookings"
+            )
+            return pd.DataFrame(columns=["month", "total_amount", "total_guests", "bookings_count"])
+
+    def cash_ledger_by_date(self, start_date: date, end_date: date) -> pd.DataFrame:
+        """Aggregate true cash flow from cash_ledger entries by date.
+
+        Returns a DataFrame with columns: date, inflow, outflow (outflow is positive values of absolute outflows).
+        """
+        try:
+            with self.db.get_connection() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT entry_date AS date,
+                           SUM(CASE WHEN amount >= 0 THEN amount ELSE 0 END)           AS inflow,
+                           SUM(CASE WHEN amount  < 0 THEN -amount ELSE 0 END)          AS outflow
+                      FROM cash_ledger
+                     WHERE entry_date BETWEEN ? AND ?
+                  GROUP BY entry_date
+                  ORDER BY entry_date
+                    """,
+                    (start_date.isoformat(), end_date.isoformat()),
+                ).fetchall()
+
+                data = [
+                    {
+                        "date": r["date"],
+                        "inflow": float(r["inflow"] or 0.0),
+                        "outflow": float(r["outflow"] or 0.0),
+                    }
+                    for r in rows
+                ]
+                return pd.DataFrame(data)
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="cash_ledger_by_date", affected_table="cash_ledger"
+            )
+            return pd.DataFrame(columns=["date", "inflow", "outflow"])
+
+    def cash_ledger_summary(self, start_date: date, end_date: date) -> Dict[str, Any]:
+        """Summary of cash ledger within range: inflow, outflow, net, entries."""
+        try:
+            with self.db.get_connection() as conn:
+                row = conn.execute(
+                    """
+                    SELECT SUM(CASE WHEN amount >= 0 THEN amount ELSE 0 END)  AS inflow,
+                           SUM(CASE WHEN amount  < 0 THEN -amount ELSE 0 END) AS outflow,
+                           SUM(amount)                                          AS net,
+                           COUNT(*)                                             AS entries
+                      FROM cash_ledger
+                     WHERE entry_date BETWEEN ? AND ?
+                    """,
+                    (start_date.isoformat(), end_date.isoformat()),
+                ).fetchone()
+
+                inflow = float(row["inflow"] or 0.0)
+                outflow = float(row["outflow"] or 0.0)
+                net = float(row["net"] or 0.0)
+                entries = int(row["entries"] or 0)
+                return {"inflow": inflow, "outflow": outflow, "net": net, "entries": entries}
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="cash_ledger_summary", affected_table="cash_ledger"
+            )
+            return {"inflow": 0.0, "outflow": 0.0, "net": 0.0, "entries": 0}
+
+    def leads_summary(self, start_date: date, end_date: date) -> Dict[str, int]:
+        """Return total leads, MQL count, SQL count in date range (created_at)."""
+        try:
+            with self.db.get_connection() as conn:
+                total_q = "SELECT COUNT(*) AS c FROM leads WHERE created_at BETWEEN ? AND ?"
+                mql_q = (
+                    "SELECT COUNT(*) AS c FROM leads WHERE created_at BETWEEN ? AND ? AND COALESCE(mql_yes, 0) = 1"
+                )
+                sql_q = (
+                    "SELECT COUNT(*) AS c FROM leads WHERE created_at BETWEEN ? AND ? AND COALESCE(sql_yes, 0) = 1"
+                )
+                params = (start_date.isoformat(), end_date.isoformat())
+                total = conn.execute(total_q, params).fetchone()["c"]
+                mql = conn.execute(mql_q, params).fetchone()["c"]
+                sql = conn.execute(sql_q, params).fetchone()["c"]
+                return {
+                    "total_leads": int(total or 0),
+                    "mql_count": int(mql or 0),
+                    "sql_count": int(sql or 0),
+                }
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="leads_summary", affected_table="leads"
+            )
+            return {"total_leads": 0, "mql_count": 0, "sql_count": 0}
+
+    def leads_by_utm(self, start_date: date, end_date: date) -> Dict[str, List[Dict[str, Any]]]:
+        """Return counts split by utm_source and utm_campaign for leads in date range."""
+        try:
+            with self.db.get_connection() as conn:
+                params = (start_date.isoformat(), end_date.isoformat())
+                by_source_rows = conn.execute(
+                    """
+                    SELECT COALESCE(NULLIF(utm_source, ''), 'Unknown') AS utm_source,
+                           COUNT(*) AS cnt
+                      FROM leads
+                     WHERE created_at BETWEEN ? AND ?
+                  GROUP BY utm_source
+                  ORDER BY cnt DESC
+                    """,
+                    params,
+                ).fetchall()
+                by_campaign_rows = conn.execute(
+                    """
+                    SELECT COALESCE(NULLIF(utm_campaign, ''), 'Unknown') AS utm_campaign,
+                           COUNT(*) AS cnt
+                      FROM leads
+                     WHERE created_at BETWEEN ? AND ?
+                  GROUP BY utm_campaign
+                  ORDER BY cnt DESC
+                    """,
+                    params,
+                ).fetchall()
+
+                by_source = [
+                    {"utm_source": r["utm_source"], "count": int(r["cnt"] or 0)}
+                    for r in by_source_rows
+                ]
+                by_campaign = [
+                    {"utm_campaign": r["utm_campaign"], "count": int(r["cnt"] or 0)}
+                    for r in by_campaign_rows
+                ]
+
+                return {"by_source": by_source, "by_campaign": by_campaign}
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="leads_by_utm", affected_table="leads"
+            )
+            return {"by_source": [], "by_campaign": []}
+
+    def lead_to_booking_lag(self, start_date: str, end_date: str) -> Dict[str, Any]:
+        """
+        Compute lead→booking lag in days for bookings within [start_date, end_date] (inclusive).
+
+        Inputs are ISO strings YYYY-MM-DD. Returns dict with summary, lag_table, utm_breakdown, monthly_cohorts.
+        Matching rules:
+        - Only consider leads with created_at <= booking_date
+        - For each booking, match most recent qualifying lead for same email
+        - If multiple same-day leads exist, pick latest created_at (ORDER BY created_at DESC LIMIT 1)
+        - Bookings without a match are excluded from lag stats but counted as unmatched
+        """
+        def _parse_date_safe(v: Any) -> Optional[pd.Timestamp]:
+            try:
+                if v is None or v == "":
+                    return None
+                ts = pd.to_datetime(v, errors="coerce")
+                return ts if pd.notnull(ts) else None
+            except Exception:
+                return None
+
+        def _median(values: List[int]) -> float:
+            if not values:
+                return 0.0
+            s = sorted(values)
+            n = len(s)
+            mid = n // 2
+            if n % 2 == 1:
+                return float(s[mid])
+            return (s[mid - 1] + s[mid]) / 2.0
+
+        def _p90(values: List[int]) -> float:
+            if not values:
+                return 0.0
+            s = sorted(values)
+            # Nearest-rank method
+            import math
+            k = max(1, math.ceil(0.9 * len(s))) - 1
+            return float(s[k])
+
+        try:
+            with self.db.get_connection() as conn:
+                # Indices to keep things snappy (portable IF NOT EXISTS)
+                try:
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_email_created ON leads(email, created_at)")
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_bookings_booking_date ON bookings(booking_date)")
+                except Exception:
+                    # Non-fatal; continue without indices
+                    pass
+
+                # Step 1: bookings in range with email
+                bookings_rows = conn.execute(
+                    """
+                    SELECT booking_id, booking_date, amount, guests, email
+                      FROM bookings
+                     WHERE COALESCE(email, '') <> ''
+                       AND booking_date BETWEEN ? AND ?
+                  ORDER BY booking_date DESC
+                    """,
+                    (start_date, end_date),
+                ).fetchall()
+
+                total_in_range = len(bookings_rows)
+                lag_records: List[Dict[str, Any]] = []
+
+                # Step 2: find most recent lead per booking
+                lead_query = (
+                    """
+                    SELECT created_at, utm_source, utm_medium, utm_campaign
+                      FROM leads
+                     WHERE email = ?
+                       AND COALESCE(created_at, '') <> ''
+                       AND created_at <= ?
+                  ORDER BY created_at DESC
+                     LIMIT 1
+                    """
+                )
+
+                for b in bookings_rows:
+                    try:
+                        email = b["email"]
+                        b_date = _parse_date_safe(b["booking_date"])
+                        if not email or b_date is None:
+                            continue
+
+                        lead_row = conn.execute(lead_query, (email, b_date.date().isoformat())).fetchone()
+                        if not lead_row:
+                            continue
+
+                        lead_dt = _parse_date_safe(lead_row["created_at"])
+                        if lead_dt is None:
+                            continue
+
+                        # Step 3: compute lag in days (booking_date - lead_created_at)
+                        lag_days = int((b_date.normalize() - lead_dt.normalize()).days)
+                        if lag_days < 0:
+                            # Safety guard; skip inconsistent data
+                            continue
+
+                        lag_records.append(
+                            {
+                                "booking_id": b["booking_id"],
+                                "booking_date": b_date.date().isoformat(),
+                                "amount": float(b["amount"] or 0.0),
+                                "guests": int(b["guests"] or 0),
+                                "email": email,
+                                "lead_created_at": lead_dt.to_pydatetime().isoformat(timespec="seconds"),
+                                "utm_source": lead_row["utm_source"],
+                                "utm_medium": lead_row["utm_medium"],
+                                "utm_campaign": lead_row["utm_campaign"],
+                                "lag_days": lag_days,
+                            }
+                        )
+                    except Exception:
+                        # Skip malformed rows, continue
+                        continue
+
+                # Step 4: aggregates
+                lags = [r["lag_days"] for r in lag_records]
+                matched = len(lag_records)
+                unmatched = max(0, total_in_range - matched)
+
+                avg_days = float(sum(lags) / matched) if matched else 0.0
+                median_days = _median(lags)
+                p90_days = _p90(lags)
+
+                # UTM breakdowns (matched only)
+                from collections import defaultdict
+
+                src_map: Dict[str, List[int]] = defaultdict(list)
+                camp_map: Dict[str, List[int]] = defaultdict(list)
+                for r in lag_records:
+                    src = r.get("utm_source") or "Unknown"
+                    camp = r.get("utm_campaign") or "Unknown"
+                    src_map[src].append(r["lag_days"])
+                    camp_map[camp].append(r["lag_days"])
+
+                by_source = [
+                    {
+                        "utm_source": k,
+                        "count": len(v),
+                        "avg_days": float(sum(v) / len(v)) if v else 0.0,
+                        "median_days": _median(v),
+                    }
+                    for k, v in sorted(src_map.items(), key=lambda kv: -len(kv[1]))
+                ]
+                by_campaign = [
+                    {
+                        "utm_campaign": k,
+                        "count": len(v),
+                        "avg_days": float(sum(v) / len(v)) if v else 0.0,
+                        "median_days": _median(v),
+                    }
+                    for k, v in sorted(camp_map.items(), key=lambda kv: -len(kv[1]))
+                ]
+
+                # Monthly cohorts by booking month
+                cohort_map: Dict[str, List[int]] = defaultdict(list)
+                for r in lag_records:
+                    m = (r["booking_date"])[:7]
+                    cohort_map[m].append(r["lag_days"])
+                monthly_cohorts = [
+                    {
+                        "month": m,
+                        "count": len(vals),
+                        "avg_days": float(sum(vals) / len(vals)) if vals else 0.0,
+                        "median_days": _median(vals),
+                    }
+                    for m, vals in sorted(cohort_map.items())
+                ]
+
+                # Step 5: assemble response
+                lag_table_sorted = sorted(
+                    lag_records, key=lambda r: r.get("booking_date", ""), reverse=True
+                )
+                top50 = lag_table_sorted[:50]
+
+                return {
+                    "summary": {
+                        "matched_bookings": matched,
+                        "unmatched_bookings": unmatched,
+                        "avg_days": avg_days,
+                        "median_days": median_days,
+                        "p90_days": p90_days,
+                    },
+                    "lag_table": top50,
+                    "utm_breakdown": {"by_source": by_source, "by_campaign": by_campaign},
+                    "monthly_cohorts": monthly_cohorts,
+                }
+        except Exception as e:
+            self.error_handler.handle_database_error(
+                e, operation="lead_to_booking_lag", affected_table="bookings/leads"
+            )
+            return {
+                "summary": {
+                    "matched_bookings": 0,
+                    "unmatched_bookings": 0,
+                    "avg_days": 0.0,
+                    "median_days": 0.0,
+                    "p90_days": 0.0,
+                },
+                "lag_table": [],
+                "utm_breakdown": {"by_source": [], "by_campaign": []},
+                "monthly_cohorts": [],
+            }
 
     def get_daily_trends(self, start_date, end_date):
         """

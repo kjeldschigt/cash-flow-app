@@ -7,13 +7,13 @@ from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, date, timedelta
 import pandas as pd
 import streamlit as st
+from src.config.settings import Settings
+from src.repositories.base import DatabaseConnection
 
 logger = logging.getLogger(__name__)
 
-# Database path
-DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "cash_flow.db"
-)
+# Database path (canonical)
+DB_PATH = Settings().database.absolute_path
 
 
 def calculate_metrics(
@@ -363,33 +363,31 @@ def load_combined_data() -> Dict[str, Any]:
         # Try to load from database
         try:
             if os.path.exists(DB_PATH):
-                conn = sqlite3.connect(DB_PATH)
+                with DatabaseConnection().get_connection() as conn:
 
-                # Load sales orders
-                try:
-                    df_sales = pd.read_sql("SELECT * FROM sales_orders", conn)
-                    if not df_sales.empty:
-                        combined_data["sales_orders"] = df_sales.to_dict("records")
-                except:
-                    pass
+                    # Load sales orders
+                    try:
+                        df_sales = pd.read_sql("SELECT * FROM sales_orders", conn)
+                        if not df_sales.empty:
+                            combined_data["sales_orders"] = df_sales.to_dict("records")
+                    except Exception:
+                        pass
 
-                # Load costs
-                try:
-                    df_costs = pd.read_sql("SELECT * FROM costs", conn)
-                    if not df_costs.empty:
-                        combined_data["costs"] = df_costs.to_dict("records")
-                except:
-                    pass
+                    # Load costs
+                    try:
+                        df_costs = pd.read_sql("SELECT * FROM costs", conn)
+                        if not df_costs.empty:
+                            combined_data["costs"] = df_costs.to_dict("records")
+                    except Exception:
+                        pass
 
-                # Load FX rates
-                try:
-                    df_fx = pd.read_sql("SELECT * FROM fx_rates", conn)
-                    if not df_fx.empty:
-                        combined_data["fx_rates"] = df_fx.to_dict("records")
-                except:
-                    pass
-
-                conn.close()
+                    # Load FX rates
+                    try:
+                        df_fx = pd.read_sql("SELECT * FROM fx_rates", conn)
+                        if not df_fx.empty:
+                            combined_data["fx_rates"] = df_fx.to_dict("records")
+                    except Exception:
+                        pass
 
         except Exception as e:
             logger.warning(f"Could not load from database: {str(e)}")

@@ -3,9 +3,10 @@ Script to update the database schema to use 'recurrence_pattern' instead of 'rec
 """
 import sqlite3
 from pathlib import Path
+from src.config.settings import Settings
 
 def update_schema():
-    db_path = Path('cash_flow.db')
+    db_path = Path(Settings().database.path)
     if not db_path.exists():
         print("Error: Database file not found at", db_path.absolute())
         return

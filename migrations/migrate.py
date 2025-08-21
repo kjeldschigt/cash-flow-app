@@ -12,10 +12,11 @@ from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from src.config.settings import Settings
 
 def get_db_path():
     """Get the database path"""
-    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cash_flow.db')
+    return Settings().database.path
 
 def init_migration_table():
     """Initialize the migrations tracking table"""

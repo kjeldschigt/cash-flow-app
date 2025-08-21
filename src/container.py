@@ -24,6 +24,10 @@ from .services.cost_service import CostService, RecurringCostService
 from .services.integration_service import IntegrationService
 from .services.analytics_service import AnalyticsService
 from .services.loan_service import LoanService
+from .services.payment_service import MockPaymentService
+from .repositories.bank_repository import BankRepository
+from .services.bank_service import BankService
+from .services.stripe_service import StripeService
 
 T = TypeVar("T")
 
@@ -70,6 +74,7 @@ class Container:
         self._singletons["recurring_cost_repository"] = RecurringCostRepository(db)
         self._singletons["integration_repository"] = IntegrationRepository(db)
         self._singletons["settings_repository"] = SettingsRepository(db)
+        self._singletons["bank_repository"] = BankRepository(db)
 
     def _register_services(self) -> None:
         """Register service instances."""
@@ -84,6 +89,8 @@ class Container:
         self._services["integration_service"] = lambda: IntegrationService(db, settings)
         self._services["analytics_service"] = lambda: AnalyticsService(db)
         self._services["loan_service"] = lambda: LoanService(db)
+        self._services["bank_service"] = lambda: BankService(db)
+        self._services["stripe_service"] = lambda: StripeService(db)
 
     def get_user_service(self) -> UserService:
         """Get user service instance."""
@@ -133,6 +140,18 @@ class Container:
             self._singletons["loan_service"] = self._services["loan_service"]()
         return self._singletons["loan_service"]
 
+    def get_bank_service(self) -> BankService:
+        """Get bank service instance."""
+        if "bank_service" not in self._singletons:
+            self._singletons["bank_service"] = self._services["bank_service"]()
+        return self._singletons["bank_service"]
+
+    def get_stripe_service(self) -> StripeService:
+        """Get stripe service instance."""
+        if "stripe_service" not in self._singletons:
+            self._singletons["stripe_service"] = self._services["stripe_service"]()
+        return self._singletons["stripe_service"]
+
     def get_user_repository(self) -> UserRepository:
         """Get user repository instance."""
         return self._singletons["user_repository"]
@@ -160,6 +179,10 @@ class Container:
     def get_settings_repository(self) -> SettingsRepository:
         """Get settings repository instance."""
         return self._singletons["settings_repository"]
+
+    def get_bank_repository(self) -> BankRepository:
+        """Get bank repository instance."""
+        return self._singletons["bank_repository"]
 
     def get_settings_service(self):
         """Get settings service - compatibility method."""
@@ -221,6 +244,14 @@ def get_container() -> Container:
     if _container is None:
         _container = Container()
         _container.configure()
+        
+        # Add payment service stub for development
+        if not hasattr(_container, 'get_payment_service'):
+            def get_payment_service():
+                # Use mock in development
+                return MockPaymentService()
+            _container.get_payment_service = get_payment_service
+            
     return _container
 
 
@@ -238,3 +269,16 @@ def cleanup_container() -> None:
     if _container:
         _container.cleanup()
         _container = None
+
+
+from src.services.cash_ledger_service import CashLedgerService
+
+def get_cash_ledger_service():
+    container = get_container()
+    return CashLedgerService(container.get_db_connection())
+
+from src.services.bank_service import BankService as _BankServiceAlias
+
+def get_bank_service():
+    container = get_container()
+    return _BankServiceAlias(container.get_db_connection())

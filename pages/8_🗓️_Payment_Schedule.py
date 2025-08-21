@@ -81,16 +81,42 @@ try:
     )
 
     try:
-        # Load scheduled payments using service
-        scheduled_payments = payment_schedule_service.get_scheduled_payments()
+        try:
+            scheduled_payments = payment_schedule_service.get_scheduled_payments()
+        except AttributeError:
+            # Fall back to sample method for mock service
+            scheduled_payments = getattr(payment_schedule_service, "get_sample_payment_schedule", lambda: [])()
 
-        if not scheduled_payments:
-            UIComponents.empty_state(
-                "No Upcoming Payments",
-                "No payments are currently scheduled. Create a payment schedule above to get started.",
-            )
+        # Normalize any dict items to a simple display format
+        payment_rows = []
+        for p in scheduled_payments:
+            if isinstance(p, dict):
+                payment_rows.append({
+                    "Name": p.get("name", "N/A"),
+                    "Amount": f"{p.get('currency', 'USD')} {p.get('amount', 0):,.2f}",
+                    "Due Date": p.get("due_date", "N/A"),
+                    "Status": p.get("status", "scheduled"),
+                })
+            else:
+                # fallback for model objects
+                due_date = getattr(p, "due_date", None)
+                if due_date and hasattr(due_date, "strftime"):
+                    due_date = due_date.strftime("%Y-%m-%d")
+                payment_rows.append({
+                    "Name": getattr(p, "name", "N/A"),
+                    "Amount": f"{getattr(p,'currency','USD')} {getattr(p,'amount',0):,.2f}",
+                    "Due Date": due_date or "N/A",
+                    "Status": getattr(p, "status", "scheduled"),
+                })
+
+        if payment_rows:
+            st.table(payment_rows)
         else:
-            # Display payments using new UI components
+            st.info("No upcoming payments found.")
+
+        # Keep the original detailed view for object-based payments
+        if scheduled_payments and not isinstance(scheduled_payments[0], dict):
+            st.subheader("Detailed Payment Management")
             for payment in scheduled_payments:
                 with st.container():
                     col1, col2, col3, col4 = st.columns([3, 2, 1, 1])

@@ -18,8 +18,8 @@ def test_authentication():
     print("Testing authentication system...")
     
     try:
-        # Initialize services
-        db_connection = DatabaseConnection("cash_flow.db")
+        # Initialize services using canonical DB path
+        db_connection = DatabaseConnection(Settings().database.path)
         user_service = UserService(db_connection)
         settings = Settings()
         auth_manager = AuthManager(user_service, settings)

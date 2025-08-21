@@ -19,6 +19,38 @@ import stripe
 import logging
 from datetime import datetime
 from enum import Enum
+import os
+
+
+class MockPaymentService:
+    """Development fallback for payment service"""
+    def get_payment_schedule(self):
+        """
+        Dev fallback – return dummy schedule if real backend is not configured.
+        """
+        return [
+            {
+                "name": "Demo Payment",
+                "amount": 2000.0,
+                "currency": "USD",
+                "due_date": datetime.now().strftime("%Y-%m-%d"),
+                "status": "scheduled",
+            }
+        ]
+
+    def get_sample_payment_schedule(self):
+        """
+        Alias used by some pages for backward compatibility.
+        """
+        return self.get_payment_schedule()
+
+    def create_payment(self, payment_data):
+        # Pretend the payment was created successfully
+        return True
+
+    def mark_as_paid(self, payment_id):
+        # Dev stub for marking as paid
+        return True
 
 
 class StripeService:

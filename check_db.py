@@ -1,9 +1,11 @@
 """Script to check database content and schema."""
 import sqlite3
+from src.config.settings import Settings
 
 def check_database():
     try:
-        conn = sqlite3.connect('cash_flow.db')
+        db_path = Settings().database.path
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # List all tables

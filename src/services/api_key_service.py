@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import sqlite3
 from src.security.api_key_encryption import get_api_key_encryption
 import logging
+from src.repositories.base import DatabaseConnection
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,9 @@ class APIKeyInfo:
 class APIKeyService:
     """Service for managing API keys with encryption"""
 
-    def __init__(self):
+    def __init__(self, db_connection: DatabaseConnection | None = None):
         self.encryption = get_api_key_encryption()
+        self.db = db_connection or DatabaseConnection()
         logger.info("API key service initialized", operation="service_init")
 
     def add_api_key(
@@ -73,9 +75,8 @@ class APIKeyService:
             # Encrypt the API key
             encrypted_value = self.encryption.encrypt_api_key(api_key)
 
-            # Store in database
-            conn = sqlite3.connect("cash_flow.db")
-            try:
+            # Store in database using DatabaseConnection
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 # Check if key name already exists
@@ -102,8 +103,6 @@ class APIKeyService:
                     ),
                 )
 
-                conn.commit()
-
                 logger.info(
                     "API key added successfully",
                     operation="add_api_key",
@@ -113,9 +112,6 @@ class APIKeyService:
                 )
 
                 return True, "API key added successfully"
-
-            finally:
-                conn.close()
 
         except Exception as e:
             logger.error(
@@ -141,8 +137,7 @@ class APIKeyService:
             List of APIKeyInfo objects with masked values
         """
         try:
-            conn = sqlite3.connect("cash_flow.db")
-            try:
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 query = """
@@ -151,7 +146,7 @@ class APIKeyService:
                     FROM api_keys
                     WHERE 1=1
                 """
-                params = []
+                params: List[Any] = []
 
                 if not include_inactive:
                     query += " AND is_active = 1"
@@ -165,34 +160,37 @@ class APIKeyService:
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
 
-                api_keys = []
+                api_keys: List[APIKeyInfo] = []
                 for row in rows:
                     # Decrypt key to create masked version
                     try:
-                        decrypted_key = self.encryption.decrypt_api_key(row[2])
+                        decrypted_key = self.encryption.decrypt_api_key(row["encrypted_value"])  # type: ignore[index]
                         masked_value = self.encryption.mask_api_key(decrypted_key)
                     except Exception as e:
                         logger.error(
                             "Failed to decrypt API key for masking",
                             operation="get_api_keys",
-                            key_id=row[0],
+                            key_id=row.get("id"),
                             error=str(e),
                         )
                         masked_value = "****ERROR****"
 
+                    created_val = row.get("created_at")
+                    last_mod_val = row.get("last_modified")
+
                     api_key_info = APIKeyInfo(
-                        id=row[0],
-                        key_name=row[1],
-                        service_type=row[3],
-                        added_by_user=row[4],
+                        id=row.get("id"),
+                        key_name=row.get("key_name"),
+                        service_type=row.get("service_type"),
+                        added_by_user=row.get("added_by_user"),
                         created_at=(
-                            datetime.fromisoformat(row[5]) if row[5] else datetime.now()
+                            datetime.fromisoformat(created_val) if created_val else datetime.now()
                         ),
                         last_modified=(
-                            datetime.fromisoformat(row[6]) if row[6] else datetime.now()
+                            datetime.fromisoformat(last_mod_val) if last_mod_val else datetime.now()
                         ),
-                        is_active=bool(row[7]),
-                        description=row[8],
+                        is_active=bool(row.get("is_active")),
+                        description=row.get("description"),
                         masked_value=masked_value,
                     )
                     api_keys.append(api_key_info)
@@ -205,9 +203,6 @@ class APIKeyService:
                 )
 
                 return api_keys
-
-            finally:
-                conn.close()
 
         except Exception as e:
             logger.error(
@@ -226,8 +221,7 @@ class APIKeyService:
             Decrypted API key value or None if not found
         """
         try:
-            conn = sqlite3.connect("cash_flow.db")
-            try:
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
@@ -241,7 +235,7 @@ class APIKeyService:
                 if not row:
                     return None
 
-                decrypted_value = self.encryption.decrypt_api_key(row[0])
+                decrypted_value = self.encryption.decrypt_api_key(row["encrypted_value"])  # type: ignore[index]
 
                 logger.info(
                     "API key value retrieved",
@@ -250,9 +244,6 @@ class APIKeyService:
                 )
 
                 return decrypted_value
-
-            finally:
-                conn.close()
 
         except Exception as e:
             logger.error(
@@ -278,8 +269,7 @@ class APIKeyService:
             Tuple of (success, message)
         """
         try:
-            conn = sqlite3.connect("cash_flow.db")
-            try:
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 # Check if key exists
@@ -295,7 +285,8 @@ class APIKeyService:
                 if not row:
                     return False, f"API key '{key_name}' not found"
 
-                key_id, service_type = row
+                key_id = row.get("id")
+                service_type = row.get("service_type")
 
                 # Validate new API key format
                 is_valid, error_msg = self.encryption.validate_api_key_format(
@@ -327,8 +318,6 @@ class APIKeyService:
                         (encrypted_value, key_id),
                     )
 
-                conn.commit()
-
                 logger.info(
                     "API key updated successfully",
                     operation="update_api_key",
@@ -337,9 +326,6 @@ class APIKeyService:
                 )
 
                 return True, "API key updated successfully"
-
-            finally:
-                conn.close()
 
         except Exception as e:
             logger.error(
@@ -361,8 +347,7 @@ class APIKeyService:
             Tuple of (success, message)
         """
         try:
-            conn = sqlite3.connect("cash_flow.db")
-            try:
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 # Check if key exists
@@ -378,7 +363,7 @@ class APIKeyService:
                 if not row:
                     return False, f"API key '{key_name}' not found"
 
-                key_id = row[0]
+                key_id = row.get("id")
 
                 # Soft delete (mark as inactive)
                 cursor.execute(
@@ -390,8 +375,6 @@ class APIKeyService:
                     (key_id,),
                 )
 
-                conn.commit()
-
                 logger.info(
                     "API key deleted successfully",
                     operation="delete_api_key",
@@ -400,9 +383,6 @@ class APIKeyService:
                 )
 
                 return True, "API key deleted successfully"
-
-            finally:
-                conn.close()
 
         except Exception as e:
             logger.error(

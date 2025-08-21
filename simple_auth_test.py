@@ -37,7 +37,8 @@ def test_basic_auth():
         
         # Test database connection and basic queries
         print("\n--- Testing Database Connection ---")
-        db_path = "cash_flow.db"
+        from src.config.settings import Settings
+        db_path = Settings().database.path
         
         # Check if database exists and has users table
         if os.path.exists(db_path):

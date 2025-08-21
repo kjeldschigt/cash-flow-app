@@ -25,7 +25,7 @@ class TestDatabaseIntegration:
     @pytest.fixture
     def clean_test_db(self, tmp_path):
         """Create a clean test database"""
-        db_path = tmp_path / "test_cash_flow.db"
+        db_path = tmp_path / "test_cashflow.db"
         
         # Temporarily override the database path
         original_db_path = os.environ.get('DATABASE_PATH')
